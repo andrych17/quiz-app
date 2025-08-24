@@ -1,7 +1,7 @@
 "use client";
 
 import { Sidebar } from "@/components/Sidebar";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export default function AdminLayout({
@@ -10,12 +10,21 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
 
+  // Don't apply auth check for login page
+  const isLoginPage = pathname === '/admin/login';
+
   useEffect(() => {
+    if (isLoginPage) {
+      setIsLoading(false);
+      return;
+    }
+
     const checkAuth = () => {
-      const isAdmin = localStorage.getItem('isAdmin') === 'true';
-      if (!isAdmin) {
+      const adminEmail = localStorage.getItem('adminEmail');
+      if (!adminEmail) {
         router.replace('/admin/login');
         return;
       }
@@ -23,12 +32,17 @@ export default function AdminLayout({
     };
 
     checkAuth();
-  }, [router]);
+  }, [router, isLoginPage]);
 
   const handleLogout = () => {
-    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('adminEmail');
     router.push('/admin/login');
   };
+
+  // For login page, render without layout
+  if (isLoginPage) {
+    return <>{children}</>;
+  }
 
   if (isLoading) {
     return (

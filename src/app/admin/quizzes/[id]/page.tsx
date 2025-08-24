@@ -57,19 +57,14 @@ export default function QuizDetailPage({ params }: PageProps) {
 
     setLoading(true);
     if (editingQuestion) {
-      // Update existing question (simplified - would need updateQuestion method in db)
-      const updatedQuestions = quiz.questions.map(q => 
-        q.id === editingQuestion.id 
-          ? { 
-              ...q, 
-              questionText: questionText.trim(), 
-              correctAnswer: correctAnswer.trim(),
-              questionType,
-              options: questionType === 'multiple-choice' ? options.filter(opt => opt.trim()) : undefined
-            }
-          : q
-      );
-      db.updateQuiz(quiz.id, { questions: updatedQuestions });
+      // For editing, we need to remove and add the question since we don't have updateQuestion method
+      db.removeQuestion(quiz.id, editingQuestion.id);
+      db.addQuestion(quiz.id, {
+        questionText: questionText.trim(),
+        correctAnswer: correctAnswer.trim(),
+        questionType,
+        options: questionType === 'multiple-choice' ? options.filter(opt => opt.trim()) : undefined
+      });
     } else {
       db.addQuestion(quiz.id, {
         questionText: questionText.trim(),
@@ -306,11 +301,11 @@ export default function QuizDetailPage({ params }: PageProps) {
           </div>
         </div>
 
-        {/* Attempts */}
+        {/* Peserta Test */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Attempts ({quiz.attempts.length})</h2>
-            {quiz.attempts.length > 0 && (
+            <h2 className="text-xl font-semibold">Peserta Test ({db.getParticipants(quiz.id).length})</h2>
+            {db.getParticipants(quiz.id).length > 0 && (
               <button
                 onClick={exportAttempts}
                 className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
@@ -319,39 +314,49 @@ export default function QuizDetailPage({ params }: PageProps) {
               </button>
             )}
           </div>
-          {quiz.attempts.length > 0 ? (
+          {db.getParticipants(quiz.id).length > 0 ? (
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Participant
+                      Peserta
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       NIJ
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Score
+                      Skor
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Submitted
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Waktu Submit
                     </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {quiz.attempts.map((attempt) => (
-                    <tr key={attempt.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {attempt.participantName}
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {db.getParticipants(quiz.id).map((participant) => (
+                    <tr key={participant.id}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">{participant.participantName}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{participant.nij}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">{participant.score} / {quiz.questions.length}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          participant.passed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {participant.passed ? 'LULUS' : 'GAGAL'}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {attempt.nij}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {attempt.score} / {quiz.questions.length}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(attempt.submittedAt).toLocaleString()}
+                        {new Date(participant.submittedAt).toLocaleString('id-ID')}
                       </td>
                     </tr>
                   ))}
@@ -359,7 +364,7 @@ export default function QuizDetailPage({ params }: PageProps) {
               </table>
             </div>
           ) : (
-            <p className="text-gray-500 text-center py-8">No attempts yet.</p>
+            <p className="text-gray-500 text-center py-8">Belum ada peserta yang mengikuti test.</p>
           )}
         </div>
       </div>

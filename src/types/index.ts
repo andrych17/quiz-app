@@ -2,15 +2,16 @@ export type Question = {
   id: string;
   order: number;
   questionText: string;
-  questionType: 'multiple-choice' | 'text'; // Support both types
+  questionType: 'multiple-choice' | 'multiple-select' | 'text'; // Support multiple types
   options?: string[]; // For multiple choice questions
-  correctAnswer: string; // For multiple choice, this will be the option text or index
+  correctAnswer: string; // For multiple choice: option text, for multiple-select: comma-separated option texts
 };
 
 export type AttemptAnswer = {
   questionId: string;
   answerText: string;
-  selectedOption?: number; // For multiple choice answers
+  selectedOption?: number; // For single multiple choice answers
+  selectedOptions?: number[]; // For multiple select answers
 };
 
 export type Attempt = {
