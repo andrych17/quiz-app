@@ -17,11 +17,11 @@ export default function AdminLoginPage() {
 
     // Dummy authentication - hardcoded credentials
     setTimeout(() => {
-      if (email === "admin@example.com" && password === "password") {
-        localStorage.setItem("adminEmail", email);
+      if (email && password) {
+        // Just redirect to dashboard for demo purposes
         router.push("/admin/dashboard");
       } else {
-        setError("Invalid email or password");
+        setError("Please fill in both email and password");
       }
       setLoading(false);
     }, 500);
@@ -114,11 +114,10 @@ export default function AdminLoginPage() {
               <svg className="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm text-blue-800 font-semibold">Demo Credentials</p>
+              <p className="text-sm text-blue-800 font-semibold">Demo Access</p>
             </div>
             <p className="text-sm text-blue-700">
-              Email: <code className="bg-blue-100 px-2 py-1 rounded text-blue-800 font-mono">admin@example.com</code><br />
-              Password: <code className="bg-blue-100 px-2 py-1 rounded text-blue-800 font-mono">password</code>
+              Enter any email and password to access the demo admin panel
             </p>
           </div>
 

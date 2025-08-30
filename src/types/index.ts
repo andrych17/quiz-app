@@ -40,3 +40,33 @@ export type Quiz = {
   passingScore: number; // minimum score to pass (out of total questions)
   questionsPerPage: number; // pagination setting
 };
+
+// Admin types
+export type User = {
+  id: string;
+  email: string;
+  name: string;
+  role: 'admin' | 'superadmin';
+  createdAt: string;
+  lastLogin?: string;
+};
+
+export type ConfigItem = {
+  id: string;
+  group: string;
+  key: string;
+  value: string;
+  description?: string;
+  order?: number;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+// Add more standardized types as needed
+export type AdminStats = {
+  totalQuizzes: number;
+  totalParticipants: number;
+  totalAttempts: number;
+  averageScore: number;
+};

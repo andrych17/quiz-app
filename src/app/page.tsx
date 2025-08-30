@@ -21,26 +21,28 @@ export default function Home() {
         <div className="transform transition-all duration-1000 ease-out animate-pulse">
           <h1 className="text-5xl md:text-6xl font-bold text-gray-800 mb-4 leading-tight">
             <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Test Online
+              Logic Test GMS Church
             </span>
           </h1>
-          
-          <h2 className="text-2xl md:text-3xl font-semibold text-gray-700 mb-6">
-            Gereja Mawar Sharon
-          </h2>
 
           <p className="text-lg text-gray-600 mb-8 leading-relaxed">
             Platform test online untuk jemaat GMS
           </p>
         </div>
 
+        {/* Creative Production Section */}
+        <div className="mb-8 p-6 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg">
+          <h2 className="text-2xl md:text-3xl font-semibold text-gray-700 mb-4">
+            Creative Production
+          </h2>
+        
+        </div>
+
         {/* CTA Button with pulse animation */}
         <div className="animate-pulse">
           <div className="inline-block">
             <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-1">
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-8 py-4 rounded-xl font-semibold text-lg shadow-xl hover:shadow-2xl transform hover:-translate-y-1 hover:scale-105 transition-all duration-300 cursor-pointer">
-                📝 Platform Test Online
-              </div>
+           
             </div>
           </div>
         </div>

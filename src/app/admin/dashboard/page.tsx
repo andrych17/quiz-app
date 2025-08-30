@@ -1,150 +1,192 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { db } from "@/lib/mockdb";
-import { Quiz, Attempt } from "@/types";
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    totalQuizzes: 0,
-    publishedQuizzes: 0,
-    totalAttempts: 0,
-    totalParticipants: 0,
-    passedParticipants: 0,
-    failedParticipants: 0,
+    totalQuizzes: 5,
+    totalUsers: 3,
+    totalParticipants: 47,
+    completedToday: 8,
+    activeQuizzes: 3,
+    avgScore: 85.6
   });
-  const [recentAttempts, setRecentAttempts] = useState<(Attempt & { quizTitle: string })[]>([]);
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = () => {
-    const adminEmail = localStorage.getItem("adminEmail");
-    if (!adminEmail) return;
-
-    const quizzes = db.listQuizzes(adminEmail);
-    const publishedQuizzes = quizzes.filter(q => q.isPublished);
-    
-    // Get statistics from participants data
-    const stats = db.getQuizStats();
-    const recentActivity = db.getRecentActivity();
-    
-    setStats({
-      totalQuizzes: quizzes.length,
-      publishedQuizzes: publishedQuizzes.length,
-      totalAttempts: stats.totalAttempts,
-      totalParticipants: stats.totalParticipants,
-      passedParticipants: stats.passedParticipants,
-      failedParticipants: stats.failedParticipants,
-    });
-    
-    setRecentAttempts(recentActivity);
-  };
+  const [recentActivity, setRecentActivity] = useState([
+    { id: 1, type: "quiz_completed", user: "Alice Johnson", quiz: "Logic Test - Pelayanan Anak", time: "2 minutes ago", score: 92 },
+    { id: 2, type: "new_participant", user: "Bob Smith", quiz: "Leadership Assessment", time: "15 minutes ago", score: null },
+    { id: 3, type: "quiz_completed", user: "Carol Wilson", quiz: "Ministry Evaluation", time: "1 hour ago", score: 78 },
+    { id: 4, type: "quiz_created", user: "Admin", quiz: "New Youth Assessment", time: "3 hours ago", score: null },
+    { id: 5, type: "quiz_completed", user: "David Brown", quiz: "Logic Test - Pelayanan Anak", time: "5 hours ago", score: 88 }
+  ]);
 
   return (
     <div>
+      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600 mt-2">Overview test dan peserta GMS Platform</p>
+        <h1 className="text-3xl font-bold text-gray-900">📊 Dashboard</h1>
+        <p className="text-gray-600 mt-2">Logic Test GMS Church - Overview</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* Key Statistics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+        {/* Total Quizzes */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Total Test</p>
+          <div className="flex items-center">
+            <div className="p-3 bg-blue-100 rounded-full">
+              <span className="text-blue-600 text-2xl">📝</span>
+            </div>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Total Quizzes</h3>
               <p className="text-2xl font-bold text-gray-900">{stats.totalQuizzes}</p>
-            </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <p className="text-sm text-green-600">{stats.activeQuizzes} active</p>
             </div>
           </div>
         </div>
 
+        {/* Total Users */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Test Aktif</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.publishedQuizzes}</p>
+          <div className="flex items-center">
+            <div className="p-3 bg-purple-100 rounded-full">
+              <span className="text-purple-600 text-2xl">👥</span>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Admin Users</h3>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+              <p className="text-sm text-blue-600">All active</p>
             </div>
           </div>
         </div>
 
+        {/* Total Participants */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Peserta Lulus</p>
-              <p className="text-2xl font-bold text-green-600">{stats.passedParticipants}</p>
+          <div className="flex items-center">
+            <div className="p-3 bg-green-100 rounded-full">
+              <span className="text-green-600 text-2xl">�</span>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Total Participants</h3>
+              <p className="text-2xl font-bold text-gray-900">{stats.totalParticipants}</p>
+              <p className="text-sm text-green-600">{stats.completedToday} today</p>
             </div>
           </div>
         </div>
 
+        {/* Average Score */}
         <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600">Peserta Tidak Lulus</p>
-              <p className="text-2xl font-bold text-red-600">{stats.failedParticipants}</p>
+          <div className="flex items-center">
+            <div className="p-3 bg-yellow-100 rounded-full">
+              <span className="text-yellow-600 text-2xl">⭐</span>
             </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Average Score</h3>
+              <p className="text-2xl font-bold text-gray-900">{stats.avgScore}%</p>
+              <p className="text-sm text-blue-600">Across all tests</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Today's Activity */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-orange-100 rounded-full">
+              <span className="text-orange-600 text-2xl">📈</span>
+            </div>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Completed Today</h3>
+              <p className="text-2xl font-bold text-gray-900">{stats.completedToday}</p>
+              <p className="text-sm text-green-600">+25% from yesterday</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-lg shadow-md p-6">
+          <div className="flex items-center">
+            <div className="p-3 bg-indigo-100 rounded-full">
+              <span className="text-indigo-600 text-2xl">⚡</span>
+            </div>
+            <div className="ml-4">
+              <h3 className="text-sm font-medium text-gray-600">Quick Actions</h3>
+              <div className="mt-2 space-y-1">
+                <button className="text-sm text-blue-600 hover:underline block">Create Quiz</button>
+                <button className="text-sm text-green-600 hover:underline block">View Reports</button>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Attempts */}
-      <div className="bg-white rounded-lg shadow-md">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">Aktivitas Terakhir</h2>
-        </div>
-        <div className="p-6">
-          {recentAttempts.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">Belum ada aktivitas</p>
-          ) : (
+      {/* Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">📋 Recent Activity</h2>
+          </div>
+          <div className="p-6">
             <div className="space-y-4">
-              {recentAttempts.map((attempt) => (
-                <div key={attempt.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                  <div>
-                    <p className="font-medium text-gray-900">{attempt.participantName}</p>
-                    <p className="text-sm text-gray-600">NIJ: {attempt.nij}</p>
-                    <p className="text-sm text-gray-600">Test: {attempt.quizTitle}</p>
+              {recentActivity.slice(0, 5).map((activity) => (
+                <div key={activity.id} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-shrink-0">
+                    {activity.type === 'quiz_completed' && (
+                      <span className="text-green-500 text-xl">✅</span>
+                    )}
+                    {activity.type === 'new_participant' && (
+                      <span className="text-blue-500 text-xl">👤</span>
+                    )}
+                    {activity.type === 'quiz_created' && (
+                      <span className="text-purple-500 text-xl">➕</span>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <div className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      attempt.passed 
-                        ? "bg-green-100 text-green-800" 
-                        : "bg-red-100 text-red-800"
-                    }`}>
-                      {attempt.passed ? "LULUS" : "TIDAK LULUS"}
-                    </div>
-                    <p className="text-sm text-gray-500 mt-1">
-                      Skor: {attempt.score} | {new Date(attempt.submittedAt).toLocaleDateString("id-ID")}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {activity.user}
                     </p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {activity.type === 'quiz_completed' && `Completed "${activity.quiz}"`}
+                      {activity.type === 'new_participant' && `Joined "${activity.quiz}"`}
+                      {activity.type === 'quiz_created' && `Created "${activity.quiz}"`}
+                      {activity.score && ` - Score: ${activity.score}%`}
+                    </p>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {activity.time}
                   </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        </div>
+
+        {/* Top Performing Quizzes */}
+        <div className="bg-white rounded-lg shadow-md">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h2 className="text-xl font-semibold text-gray-900">🏆 Top Performing Quizzes</h2>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {[
+                { name: "Logic Test - Pelayanan Anak", participants: 15, avgScore: 92.3, color: "green" },
+                { name: "Leadership Assessment", participants: 12, avgScore: 87.8, color: "blue" },
+                { name: "Ministry Evaluation", participants: 10, avgScore: 84.5, color: "purple" },
+                { name: "Youth Assessment", participants: 8, avgScore: 81.2, color: "orange" },
+                { name: "Worship Team Test", participants: 6, avgScore: 78.9, color: "pink" }
+              ].map((quiz, index) => (
+                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  <div className="flex-1">
+                    <h4 className="text-sm font-medium text-gray-900">{quiz.name}</h4>
+                    <p className="text-xs text-gray-500">{quiz.participants} participants</p>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-bold text-${quiz.color}-600`}>
+                      {quiz.avgScore}%
+                    </p>
+                    <p className="text-xs text-gray-500">avg score</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

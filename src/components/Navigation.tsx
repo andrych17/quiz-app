@@ -9,12 +9,13 @@ export default function Navigation() {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const adminEmail = localStorage.getItem("adminEmail");
-    setIsAdmin(!!adminEmail);
-  }, []);
+    // For demo purposes, we can assume user is not admin by default
+    // or check current path to determine admin status
+    setIsAdmin(pathname.startsWith('/admin') && pathname !== '/admin/login');
+  }, [pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem("adminEmail");
+    // Simply redirect for demo
     setIsAdmin(false);
     window.location.href = "/";
   };
@@ -70,9 +71,9 @@ export default function Navigation() {
             )}
           </div>
 
-          {/* Auth Actions */}
-          <div className="flex items-center space-x-4">
-            {isAdmin ? (
+          {/* Auth Actions - Only show for admin users */}
+          {isAdmin && (
+            <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-3">
                 <span className="text-sm text-gray-600">Admin Panel</span>
                 <button
@@ -82,15 +83,8 @@ export default function Navigation() {
                   Logout
                 </button>
               </div>
-            ) : (
-              <Link
-                href="/admin/login"
-                className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Admin Login
-              </Link>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Mobile Navigation */}

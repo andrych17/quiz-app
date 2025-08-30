@@ -1,9 +1,66 @@
 import { v4 as randomUUID } from "uuid";
-import { Quiz, Question, Attempt, AttemptAnswer } from "@/types";
+import { Quiz, Question, Attempt, AttemptAnswer, User, ConfigItem, AdminStats } from "@/types";
 import { isExpired } from "./date";
 import { normalizeAndScore } from "./scoring";
 import { slugify } from "./slug";
 import { makeToken } from "./token";
+
+// Mock users data for admin
+const users: User[] = [
+  {
+    id: "1",
+    email: "admin@gms.com",
+    name: "Admin GMS",
+    role: "superadmin",
+    createdAt: "2024-01-01T00:00:00Z",
+    lastLogin: "2025-01-15T10:30:00Z"
+  },
+  {
+    id: "2", 
+    email: "user@gms.com",
+    name: "User GMS",
+    role: "admin",
+    createdAt: "2024-06-15T00:00:00Z",
+    lastLogin: "2025-01-14T15:45:00Z"
+  }
+];
+
+// Mock config data
+const configs: ConfigItem[] = [
+  {
+    id: "1",
+    group: "Ministry Types",
+    key: "pelayanan_anak",
+    value: "Pelayanan Anak",
+    description: "Pelayanan untuk anak-anak gereja",
+    order: 1,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: "2",
+    group: "Ministry Types",
+    key: "pelayanan_remaja", 
+    value: "Pelayanan Remaja",
+    description: "Pelayanan untuk remaja gereja",
+    order: 2,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z"
+  },
+  {
+    id: "3",
+    group: "Question Types",
+    key: "multiple_choice",
+    value: "Multiple Choice",
+    description: "Pilihan ganda dengan satu jawaban benar",
+    order: 1,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z"
+  }
+];
 
 // Mock participants data - separate from quiz attempts
 let participants: Attempt[] = [];
@@ -648,5 +705,99 @@ export const db = {
           quizTitle: quiz ? quiz.title : 'Unknown Test'
         };
       });
+  },
+
+  // User management methods
+  getUsers: (): User[] => {
+    return users;
+  },
+
+  getUserById: (id: string): User | null => {
+    return users.find(u => u.id === id) || null;
+  },
+
+  createUser: (userData: Omit<User, 'id' | 'createdAt'>): User => {
+    const newUser: User = {
+      ...userData,
+      id: randomUUID(),
+      createdAt: new Date().toISOString()
+    };
+    users.push(newUser);
+    return newUser;
+  },
+
+  updateUser: (id: string, userData: Partial<User>): User | null => {
+    const userIndex = users.findIndex(u => u.id === id);
+    if (userIndex === -1) return null;
+    
+    users[userIndex] = { ...users[userIndex], ...userData };
+    return users[userIndex];
+  },
+
+  deleteUser: (id: string): boolean => {
+    const userIndex = users.findIndex(u => u.id === id);
+    if (userIndex === -1) return false;
+    
+    users.splice(userIndex, 1);
+    return true;
+  },
+
+  // Config management methods
+  getConfigs: (): ConfigItem[] => {
+    return configs;
+  },
+
+  getConfigsByGroup: (group: string): ConfigItem[] => {
+    return configs.filter(c => c.group === group);
+  },
+
+  createConfig: (configData: Omit<ConfigItem, 'id' | 'createdAt' | 'updatedAt'>): ConfigItem => {
+    const newConfig: ConfigItem = {
+      ...configData,
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    configs.push(newConfig);
+    return newConfig;
+  },
+
+  updateConfig: (id: string, configData: Partial<ConfigItem>): ConfigItem | null => {
+    const configIndex = configs.findIndex(c => c.id === id);
+    if (configIndex === -1) return null;
+    
+    configs[configIndex] = { 
+      ...configs[configIndex], 
+      ...configData,
+      updatedAt: new Date().toISOString()
+    };
+    return configs[configIndex];
+  },
+
+  deleteConfig: (id: string): boolean => {
+    const configIndex = configs.findIndex(c => c.id === id);
+    if (configIndex === -1) return false;
+    
+    configs.splice(configIndex, 1);
+    return true;
+  },
+
+  // Admin stats method
+  getAdminStats: (): AdminStats => {
+    const totalParticipants = participants.length;
+    const totalAttempts = quizzes.reduce((sum, quiz) => sum + quiz.attempts.length, 0);
+    
+    const averageScore = totalAttempts > 0 
+      ? quizzes.reduce((sum, quiz) => 
+          sum + quiz.attempts.reduce((s, a) => s + a.score, 0), 0
+        ) / totalAttempts
+      : 0;
+
+    return {
+      totalQuizzes: quizzes.length,
+      totalParticipants,
+      totalAttempts,
+      averageScore: Math.round(averageScore * 100) / 100
+    };
   },
 };
