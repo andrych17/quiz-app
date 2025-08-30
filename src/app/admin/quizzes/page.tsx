@@ -1,13 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import DataTable, { Column } from "@/components/ui/common/DataTable";
 import { Modal } from "@/components/ui/common/Modal";
 import { FormField, TextField, TextArea, Select, Button } from "@/components/ui/common/FormControls";
+import { db } from "@/lib/mockdb";
+import { Quiz } from "@/types";
 
-// Types
-interface Quiz {
-  id: number;
+// Admin Quiz interface for display
+interface AdminQuiz {
+  id: string;
   title: string;
   description: string;
   questions: number;
@@ -18,53 +21,39 @@ interface Quiz {
   participants: number;
 }
 
-// Mock data
-const mockQuizzes: Quiz[] = [
-  {
-    id: 1,
-    title: "Logic Test - Pelayanan Anak",
-    description: "Test logika untuk calon pelayan anak-anak",
-    questions: 20,
-    duration: 30,
-    status: "published",
-    createdBy: "Admin",
-    createdAt: "2025-08-25T10:00:00Z",
-    participants: 15
-  },
-  {
-    id: 2,
-    title: "Leadership Assessment",
-    description: "Assessment untuk posisi leadership dalam gereja",
-    questions: 15,
-    duration: 25,
-    status: "published",
-    createdBy: "Admin",
-    createdAt: "2025-08-20T14:30:00Z",
-    participants: 12
-  },
-  {
-    id: 3,
-    title: "Ministry Evaluation",
-    description: "Evaluasi untuk berbagai bidang pelayanan",
-    questions: 18,
-    duration: 35,
-    status: "draft",
-    createdBy: "Admin",
-    createdAt: "2025-08-28T09:15:00Z",
-    participants: 0
-  }
-];
-
 export default function QuizzesPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>(mockQuizzes);
+  const [quizzes, setQuizzes] = useState<AdminQuiz[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingQuiz, setEditingQuiz] = useState<Quiz | null>(null);
+  const [editingQuiz, setEditingQuiz] = useState<AdminQuiz | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    loadQuizzes();
+  }, []);
+
+  const loadQuizzes = () => {
+    const allQuizzes = db.listQuizzes();
+    // Convert Quiz to AdminQuiz format
+    const adminQuizzes: AdminQuiz[] = allQuizzes.map(quiz => ({
+      id: quiz.id,
+      title: quiz.title,
+      description: `Quiz dengan ${quiz.questions.length} pertanyaan`,
+      questions: quiz.questions.length,
+      duration: 30, // default duration
+      status: quiz.isPublished ? 'published' : 'draft',
+      createdBy: quiz.createdBy,
+      createdAt: quiz.createdAt,
+      participants: quiz.attempts.length
+    }));
+    setQuizzes(adminQuizzes);
+  };
+
   const [formData, setFormData] = useState({
     title: "",
     description: "",
     questions: 10,
     duration: 30,
-    status: "draft" as Quiz['status']
+    status: "draft" as "draft" | "published" | "archived"
   });
 
   const columns: Column[] = [
@@ -125,13 +114,37 @@ export default function QuizzesPage() {
       label: "Created",
       render: (value) => new Date(value).toLocaleDateString('id-ID', {
         year: 'numeric',
-        month: 'short', 
+        month: 'short',
         day: 'numeric'
       })
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (_, row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleView(row)}
+            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+          >
+            👁️ View
+          </button>
+          <button
+            onClick={() => handleEdit(row)}
+            className="text-yellow-600 hover:text-yellow-900 text-sm font-medium"
+          >
+            ✏️ Edit
+          </button>
+          <button
+            onClick={() => handleDelete(row)}
+            className="text-red-600 hover:text-red-900 text-sm font-medium"
+          >
+            🗑️ Delete
+          </button>
+        </div>
+      )
     }
-  ];
-
-  const handleAdd = () => {
+  ];  const handleAdd = () => {
     setFormData({
       title: "",
       description: "",
@@ -143,7 +156,11 @@ export default function QuizzesPage() {
     setShowAddModal(true);
   };
 
-  const handleEdit = (quiz: Quiz) => {
+  const handleView = (quiz: AdminQuiz) => {
+    router.push(`/admin/quizzes/${quiz.id}`);
+  };
+
+  const handleEdit = (quiz: AdminQuiz) => {
     setFormData({
       title: quiz.title,
       description: quiz.description,
@@ -155,32 +172,30 @@ export default function QuizzesPage() {
     setShowAddModal(true);
   };
 
-  const handleDelete = (quiz: Quiz) => {
+  const handleDelete = (quiz: AdminQuiz) => {
     if (confirm(`Are you sure you want to delete "${quiz.title}"?`)) {
-      setQuizzes(quizzes.filter(q => q.id !== quiz.id));
+      db.deleteQuiz(quiz.id);
+      loadQuizzes(); // Reload from database
     }
   };
 
   const handleSave = () => {
     if (editingQuiz) {
-      // Edit existing quiz
-      setQuizzes(quizzes.map(q => 
-        q.id === editingQuiz.id 
-          ? { ...q, ...formData }
-          : q
-      ));
+      // Edit existing quiz - update in database
+      db.updateQuiz(editingQuiz.id, {
+        title: formData.title,
+        isPublished: formData.status === 'published'
+      });
     } else {
-      // Add new quiz
-      const newQuiz: Quiz = {
-        id: Math.max(...quizzes.map(q => q.id)) + 1,
-        ...formData,
-        createdBy: "Admin",
-        createdAt: new Date().toISOString(),
-        participants: 0
-      };
-      setQuizzes([...quizzes, newQuiz]);
+      // Add new quiz - create in database
+      db.createQuiz({
+        title: formData.title,
+        createdBy: "Admin", 
+        expiresAt: undefined
+      });
     }
     setShowAddModal(false);
+    loadQuizzes(); // Reload from database
   };
 
   return (
@@ -259,8 +274,6 @@ export default function QuizzesPage() {
       <DataTable
         columns={columns}
         data={quizzes}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
         searchable={true}
         sortable={true}
         pagination={true}
