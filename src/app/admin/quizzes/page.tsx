@@ -140,7 +140,7 @@ export default function QuizzesPage() {
   };
 
   const handleDelete = (quiz: Quiz) => {
-    if (confirm(`Are you sure you want to delete "${quiz.title}"?`)) {
+    if (confirm(`Are you sure you want to delete &quot;${quiz.title}&quot;?`)) {
       const success = db.deleteQuiz(quiz.id);
       if (success) {
         loadQuizzes();

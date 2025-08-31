@@ -182,7 +182,7 @@ const configs: ConfigItem[] = [
 // Mock participants data - separate from quiz attempts
 let participants: Attempt[] = [];
 
-let quizzes: Quiz[] = [
+const quizzes: Quiz[] = [
   {
     id: randomUUID(),
     title: "Test Masuk Service Management Batch 1",

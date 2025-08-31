@@ -73,6 +73,71 @@ const mockConfigs: ConfigItem[] = [
     updatedBy: "admin",
     isActive: false,
     status: "inactive"
+  },
+  {
+    id: "6",
+    group: "Locations",
+    key: "surabaya",
+    value: "Surabaya",
+    description: "Kota Surabaya, Jawa Timur",
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2025-01-30T12:00:00Z",
+    createdBy: "admin",
+    updatedBy: "admin",
+    isActive: true,
+    status: "active"
+  },
+  {
+    id: "7",
+    group: "Locations",
+    key: "malang",
+    value: "Malang",
+    description: "Kota Malang, Jawa Timur",
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2025-01-30T12:00:00Z",
+    createdBy: "admin",
+    updatedBy: "admin",
+    isActive: true,
+    status: "active"
+  },
+  {
+    id: "8",
+    group: "Locations",
+    key: "jakarta",
+    value: "Jakarta",
+    description: "DKI Jakarta",
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2025-01-30T12:00:00Z",
+    createdBy: "admin",
+    updatedBy: "admin",
+    isActive: true,
+    status: "active"
+  },
+  {
+    id: "9",
+    group: "Locations",
+    key: "bandung",
+    value: "Bandung",
+    description: "Kota Bandung, Jawa Barat",
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2025-01-30T12:00:00Z",
+    createdBy: "admin",
+    updatedBy: "admin",
+    isActive: true,
+    status: "active"
+  },
+  {
+    id: "10",
+    group: "Locations",
+    key: "yogyakarta",
+    value: "Yogyakarta",
+    description: "Daerah Istimewa Yogyakarta",
+    createdAt: "2024-01-10T08:00:00Z",
+    updatedAt: "2025-01-30T12:00:00Z",
+    createdBy: "admin",
+    updatedBy: "admin",
+    isActive: true,
+    status: "active"
   }
 ];
 
@@ -88,7 +153,8 @@ export default function ConfigPage() {
       filterType: "select",
       filterOptions: [
         { value: "Ministry Types", label: "Ministry Types" },
-        { value: "Question Types", label: "Question Types" }
+        { value: "Question Types", label: "Question Types" },
+        { value: "Locations", label: "Locations" }
       ],
       render: (value) => (
         <span className="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 border border-blue-200">

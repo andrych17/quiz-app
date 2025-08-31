@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { BaseEditForm } from "@/components/ui/common/BaseEditForm";
 import { FormField, TextField, TextArea, Select } from "@/components/ui/common/FormControls";
 import { db } from "@/lib/mockdb";
-import { Quiz } from "@/types";
+import { Quiz, Question } from "@/types";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -31,7 +31,7 @@ function QuizEditContent({ quizId }: { quizId: string }) {
     isPublished: false,
     expiresAt: "",
     // Questions will be managed separately
-    questions: [] as any[],
+    questions: [] as Question[],
     // Settings
     timeLimit: 30,
     allowRetake: false,
@@ -41,7 +41,7 @@ function QuizEditContent({ quizId }: { quizId: string }) {
 
   // Question modal state
   const [showQuestionModal, setShowQuestionModal] = useState(false);
-  const [editingQuestion, setEditingQuestion] = useState<any>(null);
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [questionFormData, setQuestionFormData] = useState({
     questionText: "",
     questionType: "multiple-choice" as "multiple-choice" | "text",
@@ -126,7 +126,7 @@ function QuizEditContent({ quizId }: { quizId: string }) {
   const handleDelete = async () => {
     if (!quiz) return;
     
-    if (confirm(`Are you sure you want to delete "${quiz.title}"?`)) {
+    if (confirm(`Are you sure you want to delete &quot;${quiz.title}&quot;?`)) {
       try {
         const success = db.deleteQuiz(quizId);
         if (success) {
@@ -187,11 +187,11 @@ function QuizEditContent({ quizId }: { quizId: string }) {
     });
   };
 
-  const handleEditQuestion = (question: any) => {
+  const handleEditQuestion = (question: Question) => {
     setEditingQuestion(question);
     setQuestionFormData({
       questionText: question.questionText,
-      questionType: question.questionType || 'multiple-choice',
+      questionType: question.questionType === 'multiple-select' ? 'multiple-choice' : question.questionType as 'multiple-choice' | 'text',
       correctAnswer: question.correctAnswer,
       options: question.options || ["", "", "", ""]
     });
