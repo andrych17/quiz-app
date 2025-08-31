@@ -9,19 +9,133 @@ import { makeToken } from "./token";
 const users: User[] = [
   {
     id: "1",
-    email: "admin@gms.com",
-    name: "Admin GMS",
+    email: "superadmin@gms.com",
+    name: "Super Admin GMS",
     role: "superadmin",
     createdAt: "2024-01-01T00:00:00Z",
-    lastLogin: "2025-01-15T10:30:00Z"
+    updatedAt: "2025-08-15T10:30:00Z",
+    createdBy: "system",
+    updatedBy: "superadmin@gms.com",
+    lastLogin: "2025-08-31T10:30:00Z",
+    isActive: true
   },
   {
     id: "2", 
-    email: "user@gms.com",
-    name: "User GMS",
+    email: "admin@gms.com",
+    name: "Admin GMS",
     role: "admin",
-    createdAt: "2024-06-15T00:00:00Z",
-    lastLogin: "2025-01-14T15:45:00Z"
+    createdAt: "2024-02-15T00:00:00Z",
+    updatedAt: "2025-07-20T12:15:00Z",
+    createdBy: "superadmin@gms.com",
+    updatedBy: "admin@gms.com",
+    lastLogin: "2025-08-30T15:45:00Z",
+    isActive: true
+  },
+  {
+    id: "3",
+    email: "john.doe@gms.com",
+    name: "John Doe",
+    role: "admin",
+    createdAt: "2024-03-20T00:00:00Z",
+    updatedAt: "2025-06-10T14:30:00Z",
+    createdBy: "superadmin@gms.com",
+    updatedBy: "superadmin@gms.com",
+    lastLogin: "2025-08-29T08:20:00Z",
+    isActive: true
+  },
+  {
+    id: "4",
+    email: "jane.smith@gms.com", 
+    name: "Jane Smith",
+    role: "admin",
+    createdAt: "2024-04-10T00:00:00Z",
+    updatedAt: "2025-05-25T16:45:00Z",
+    createdBy: "admin@gms.com",
+    updatedBy: "jane.smith@gms.com",
+    lastLogin: "2025-08-28T14:15:00Z",
+    isActive: true
+  },
+  {
+    id: "5",
+    email: "michael.wilson@gms.com",
+    name: "Michael Wilson",
+    role: "superadmin",
+    createdAt: "2024-05-05T00:00:00Z",
+    updatedAt: "2025-04-18T11:20:00Z",
+    createdBy: "superadmin@gms.com",
+    updatedBy: "michael.wilson@gms.com",
+    lastLogin: "2025-08-27T16:30:00Z",
+    isActive: true
+  },
+  {
+    id: "6",
+    email: "sarah.johnson@gms.com",
+    name: "Sarah Johnson",
+    role: "admin",
+    createdAt: "2024-06-12T00:00:00Z",
+    updatedAt: "2025-03-30T09:10:00Z",
+    createdBy: "admin@gms.com",
+    updatedBy: "sarah.johnson@gms.com",
+    lastLogin: "2025-08-26T11:45:00Z",
+    isActive: true
+  },
+  {
+    id: "7",
+    email: "david.brown@gms.com",
+    name: "David Brown",
+    role: "admin", 
+    createdAt: "2024-07-18T00:00:00Z",
+    createdBy: "superadmin@gms.com",
+    lastLogin: "2025-08-25T13:20:00Z",
+    isActive: true
+  },
+  {
+    id: "8",
+    email: "emily.davis@gms.com",
+    name: "Emily Davis",
+    role: "admin",
+    createdAt: "2024-08-22T00:00:00Z",
+    createdBy: "admin@gms.com",
+    lastLogin: "2025-08-24T09:10:00Z",
+    isActive: false
+  },
+  {
+    id: "9",
+    email: "robert.miller@gms.com",
+    name: "Robert Miller", 
+    role: "superadmin",
+    createdAt: "2024-09-08T00:00:00Z",
+    createdBy: "superadmin@gms.com",
+    lastLogin: "2025-08-23T12:35:00Z",
+    isActive: true
+  },
+  {
+    id: "10",
+    email: "lisa.garcia@gms.com",
+    name: "Lisa Garcia",
+    role: "admin",
+    createdAt: "2024-10-14T00:00:00Z",
+    createdBy: "admin@gms.com",
+    lastLogin: "2025-08-22T15:50:00Z",
+    isActive: true
+  },
+  {
+    id: "11",
+    email: "james.rodriguez@gms.com",
+    name: "James Rodriguez",
+    role: "admin",
+    createdAt: "2024-11-25T00:00:00Z",
+    createdBy: "superadmin@gms.com",
+    isActive: false
+  },
+  {
+    id: "12",
+    email: "amanda.martinez@gms.com",
+    name: "Amanda Martinez", 
+    role: "admin",
+    createdAt: "2024-12-30T00:00:00Z",
+    createdBy: "admin@gms.com",
+    isActive: true
   }
 ];
 
@@ -36,7 +150,8 @@ const configs: ConfigItem[] = [
     order: 1,
     isActive: true,
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z"
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
   },
   {
     id: "2",
@@ -47,7 +162,8 @@ const configs: ConfigItem[] = [
     order: 2,
     isActive: true,
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z"
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
   },
   {
     id: "3",
@@ -58,7 +174,8 @@ const configs: ConfigItem[] = [
     order: 1,
     isActive: true,
     createdAt: "2024-01-01T00:00:00Z",
-    updatedAt: "2024-01-01T00:00:00Z"
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
   }
 ];
 
@@ -716,11 +833,13 @@ export const db = {
     return users.find(u => u.id === id) || null;
   },
 
-  createUser: (userData: Omit<User, 'id' | 'createdAt'>): User => {
+  createUser: (userData: Omit<User, 'id' | 'createdAt' | 'isActive'>): User => {
     const newUser: User = {
       ...userData,
       id: randomUUID(),
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      createdBy: "admin@gms.com", // In real app, get from session
+      isActive: true
     };
     users.push(newUser);
     return newUser;
@@ -730,7 +849,12 @@ export const db = {
     const userIndex = users.findIndex(u => u.id === id);
     if (userIndex === -1) return null;
     
-    users[userIndex] = { ...users[userIndex], ...userData };
+    users[userIndex] = { 
+      ...users[userIndex], 
+      ...userData,
+      updatedAt: new Date().toISOString(),
+      updatedBy: "admin@gms.com" // In real app, get from session
+    };
     return users[userIndex];
   },
 
@@ -751,12 +875,14 @@ export const db = {
     return configs.filter(c => c.group === group);
   },
 
-  createConfig: (configData: Omit<ConfigItem, 'id' | 'createdAt' | 'updatedAt'>): ConfigItem => {
+  createConfig: (configData: Omit<ConfigItem, 'id' | 'createdAt' | 'updatedAt' | 'isActive'>): ConfigItem => {
     const newConfig: ConfigItem = {
       ...configData,
       id: randomUUID(),
       createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      updatedAt: new Date().toISOString(),
+      createdBy: "admin@gms.com", // In real app, get from session
+      isActive: true
     };
     configs.push(newConfig);
     return newConfig;

@@ -2,29 +2,13 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { BaseIndexForm } from "@/components/ui/common/BaseIndexForm";
 import DataTable, { Column } from "@/components/ui/common/DataTable";
-import { Modal } from "@/components/ui/common/Modal";
-import { FormField, TextField, TextArea, Select, Button } from "@/components/ui/common/FormControls";
 import { db } from "@/lib/mockdb";
 import { Quiz } from "@/types";
 
-// Admin Quiz interface for display
-interface AdminQuiz {
-  id: string;
-  title: string;
-  description: string;
-  questions: number;
-  duration: number; // in minutes
-  status: 'draft' | 'published' | 'archived';
-  createdBy: string;
-  createdAt: string;
-  participants: number;
-}
-
 export default function QuizzesPage() {
-  const [quizzes, setQuizzes] = useState<AdminQuiz[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingQuiz, setEditingQuiz] = useState<AdminQuiz | null>(null);
+  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -32,82 +16,83 @@ export default function QuizzesPage() {
   }, []);
 
   const loadQuizzes = () => {
-    const allQuizzes = db.listQuizzes();
-    // Convert Quiz to AdminQuiz format
-    const adminQuizzes: AdminQuiz[] = allQuizzes.map(quiz => ({
-      id: quiz.id,
-      title: quiz.title,
-      description: `Quiz dengan ${quiz.questions.length} pertanyaan`,
-      questions: quiz.questions.length,
-      duration: 30, // default duration
-      status: quiz.isPublished ? 'published' : 'draft',
-      createdBy: quiz.createdBy,
-      createdAt: quiz.createdAt,
-      participants: quiz.attempts.length
-    }));
-    setQuizzes(adminQuizzes);
+    const dbQuizzes = db.listQuizzes();
+    setQuizzes(dbQuizzes);
   };
-
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    questions: 10,
-    duration: 30,
-    status: "draft" as "draft" | "published" | "archived"
-  });
 
   const columns: Column[] = [
     {
       key: "title",
-      label: "Quiz",
+      label: "Quiz Title",
+      filterable: true,
       render: (value, row) => (
         <div>
           <div className="font-medium text-gray-900">{value}</div>
-          <div className="text-sm text-gray-500">{row.description}</div>
+          <div className="text-sm text-gray-500">
+            {row.questions.length} questions • Created by {row.createdBy}
+          </div>
         </div>
+      )
+    },
+    {
+      key: "isPublished",
+      label: "Status",
+      filterable: true,
+      filterType: "select",
+      filterOptions: [
+        { value: "true", label: "Published" },
+        { value: "false", label: "Draft" }
+      ],
+      render: (value) => (
+        <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+          value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+        }`}>
+          <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
+            value ? 'bg-green-400' : 'bg-yellow-400'
+          }`}></span>
+          {value ? 'Published' : 'Draft'}
+        </span>
       )
     },
     {
       key: "questions",
       label: "Questions",
       render: (value) => (
-        <span className="text-sm font-medium">{value} questions</span>
+        <div className="text-center">
+          <div className="text-sm font-medium">{value.length}</div>
+          <div className="text-xs text-gray-500">questions</div>
+        </div>
       )
     },
     {
-      key: "duration",
-      label: "Duration",
-      render: (value) => (
-        <span className="text-sm font-medium">{value} minutes</span>
-      )
-    },
-    {
-      key: "status",
-      label: "Status",
-      render: (value) => {
-        const colors = {
-          draft: 'bg-yellow-100 text-yellow-800',
-          published: 'bg-green-100 text-green-800',
-          archived: 'bg-gray-100 text-gray-800'
-        };
-        return (
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${colors[value as keyof typeof colors]}`}>
-            {value === 'draft' && '📝 Draft'}
-            {value === 'published' && '✅ Published'}
-            {value === 'archived' && '📁 Archived'}
-          </span>
-        );
-      }
-    },
-    {
-      key: "participants",
+      key: "attempts",
       label: "Participants",
       render: (value) => (
         <div className="text-center">
-          <div className="text-sm font-medium">{value}</div>
+          <div className="text-sm font-medium">{value.length}</div>
           <div className="text-xs text-gray-500">participants</div>
         </div>
       )
+    },
+    {
+      key: "expiresAt",
+      label: "Expires",
+      render: (value) => {
+        if (!value) return <span className="text-gray-400 text-sm">No expiry</span>;
+        const isExpired = new Date(value) < new Date();
+        return (
+          <div className={`text-sm ${isExpired ? 'text-red-600' : 'text-gray-900'}`}>
+            {new Date(value).toLocaleDateString('id-ID', {
+              year: 'numeric',
+              month: 'short',
+              day: 'numeric'
+            })}
+            {isExpired && (
+              <div className="text-xs text-red-500">Expired</div>
+            )}
+          </div>
+        );
+      }
     },
     {
       key: "createdAt",
@@ -124,153 +109,52 @@ export default function QuizzesPage() {
       render: (_, row) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleView(row)}
-            className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-          >
-            👁️ View
-          </button>
-          <button
             onClick={() => handleEdit(row)}
-            className="text-yellow-600 hover:text-yellow-900 text-sm font-medium"
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
           >
-            ✏️ Edit
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
           </button>
           <button
             onClick={() => handleDelete(row)}
-            className="text-red-600 hover:text-red-900 text-sm font-medium"
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
           >
-            🗑️ Delete
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
           </button>
         </div>
       )
     }
-  ];  const handleAdd = () => {
-    setFormData({
-      title: "",
-      description: "",
-      questions: 10,
-      duration: 30,
-      status: "draft"
-    });
-    setEditingQuiz(null);
-    setShowAddModal(true);
-  };
+  ];
 
-  const handleView = (quiz: AdminQuiz) => {
+  const handleView = (quiz: Quiz) => {
     router.push(`/admin/quizzes/${quiz.id}`);
   };
 
-  const handleEdit = (quiz: AdminQuiz) => {
-    setFormData({
-      title: quiz.title,
-      description: quiz.description,
-      questions: quiz.questions,
-      duration: quiz.duration,
-      status: quiz.status
-    });
-    setEditingQuiz(quiz);
-    setShowAddModal(true);
+  const handleEdit = (quiz: Quiz) => {
+    router.push(`/admin/quizzes/${quiz.id}/edit`);
   };
 
-  const handleDelete = (quiz: AdminQuiz) => {
+  const handleDelete = (quiz: Quiz) => {
     if (confirm(`Are you sure you want to delete "${quiz.title}"?`)) {
-      db.deleteQuiz(quiz.id);
-      loadQuizzes(); // Reload from database
+      const success = db.deleteQuiz(quiz.id);
+      if (success) {
+        loadQuizzes();
+      }
     }
-  };
-
-  const handleSave = () => {
-    if (editingQuiz) {
-      // Edit existing quiz - update in database
-      db.updateQuiz(editingQuiz.id, {
-        title: formData.title,
-        isPublished: formData.status === 'published'
-      });
-    } else {
-      // Add new quiz - create in database
-      db.createQuiz({
-        title: formData.title,
-        createdBy: "Admin", 
-        expiresAt: undefined
-      });
-    }
-    setShowAddModal(false);
-    loadQuizzes(); // Reload from database
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">📝 Quiz Management</h1>
-            <p className="text-gray-600 mt-2">Kelola quiz dan assessment untuk jemaat</p>
-          </div>
-          <Button onClick={handleAdd}>
-            ➕ Create Quiz
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <span className="text-blue-600 text-2xl">📝</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Total Quizzes</h3>
-              <p className="text-3xl font-bold text-blue-600">{quizzes.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <span className="text-green-600 text-2xl">✅</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Published</h3>
-              <p className="text-3xl font-bold text-green-600">
-                {quizzes.filter(q => q.status === 'published').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-yellow-100 rounded-lg">
-              <span className="text-yellow-600 text-2xl">📝</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Draft</h3>
-              <p className="text-3xl font-bold text-yellow-600">
-                {quizzes.filter(q => q.status === 'draft').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <span className="text-purple-600 text-2xl">👥</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Participants</h3>
-              <p className="text-3xl font-bold text-purple-600">
-                {quizzes.reduce((sum, q) => sum + q.participants, 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quizzes Table */}
+    <BaseIndexForm
+      title="Quiz Management"
+      subtitle="Manage quizzes and assessments with comprehensive question management"
+      createUrl="/admin/quizzes/create/edit"
+      createLabel="Create New Quiz"
+    >
       <DataTable
         columns={columns}
         data={quizzes}
@@ -278,75 +162,8 @@ export default function QuizzesPage() {
         sortable={true}
         pagination={true}
         pageSize={10}
+        pageSizeOptions={[5, 10, 25, 50]}
       />
-
-      {/* Add/Edit Quiz Modal */}
-      <Modal 
-        isOpen={showAddModal} 
-        onClose={() => setShowAddModal(false)}
-        title={editingQuiz ? "Edit Quiz" : "Create New Quiz"}
-        size="lg"
-      >
-        <div className="space-y-4">
-          <FormField label="Quiz Title" required>
-            <TextField
-              value={formData.title}
-              onChange={(value) => setFormData({...formData, title: value})}
-              placeholder="Enter quiz title"
-            />
-          </FormField>
-          
-          <FormField label="Description" required>
-            <TextArea
-              value={formData.description}
-              onChange={(value) => setFormData({...formData, description: value})}
-              placeholder="Enter quiz description"
-              rows={3}
-            />
-          </FormField>
-
-          <div className="grid grid-cols-2 gap-4">
-            <FormField label="Number of Questions" required>
-              <TextField
-                type="number"
-                value={formData.questions.toString()}
-                onChange={(value) => setFormData({...formData, questions: parseInt(value) || 0})}
-                placeholder="10"
-              />
-            </FormField>
-            
-            <FormField label="Duration (minutes)" required>
-              <TextField
-                type="number"
-                value={formData.duration.toString()}
-                onChange={(value) => setFormData({...formData, duration: parseInt(value) || 0})}
-                placeholder="30"
-              />
-            </FormField>
-          </div>
-          
-          <FormField label="Status" required>
-            <Select
-              value={formData.status}
-              onChange={(value) => setFormData({...formData, status: value as "draft" | "published" | "archived"})}
-              options={[
-                { value: "draft", label: "📝 Draft" },
-                { value: "published", label: "✅ Published" },
-                { value: "archived", label: "📁 Archived" }
-              ]}
-            />
-          </FormField>
-          
-          <div className="flex space-x-3 pt-4">
-            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              {editingQuiz ? "Update" : "Create"} Quiz
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+    </BaseIndexForm>
   );
 }

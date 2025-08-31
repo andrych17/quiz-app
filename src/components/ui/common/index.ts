@@ -20,3 +20,7 @@ export type {
 
 export { Modal, ConfirmModal } from './Modal';
 export type { ModalProps, ConfirmModalProps } from './Modal';
+
+export { BaseForm } from './BaseForm';
+export { BaseIndexForm } from './BaseIndexForm';
+export { BaseEditForm } from './BaseEditForm';

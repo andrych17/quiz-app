@@ -1,62 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { BaseIndexForm } from "@/components/ui/common/BaseIndexForm";
 import DataTable, { Column } from "@/components/ui/common/DataTable";
-import { Modal } from "@/components/ui/common/Modal";
-import { FormField, TextField, Select, Button } from "@/components/ui/common/FormControls";
-
-// Types
-interface User {
-  id: number;
-  name: string;
-  email: string;
-  role: string;
-  lastLogin: string;
-  status: 'active' | 'inactive';
-}
-
-// Mock data
-const mockUsers: User[] = [
-  {
-    id: 1,
-    name: "John Doe",
-    email: "john@gms.church",
-    role: "superadmin",
-    lastLogin: "2025-08-30T10:00:00Z",
-    status: "active"
-  },
-  {
-    id: 2,
-    name: "Jane Smith",
-    email: "jane@gms.church", 
-    role: "admin",
-    lastLogin: "2025-08-29T14:30:00Z",
-    status: "active"
-  },
-  {
-    id: 3,
-    name: "Mike Johnson",
-    email: "mike@gms.church",
-    role: "admin", 
-    lastLogin: "2025-08-28T09:15:00Z",
-    status: "inactive"
-  }
-];
+import { db } from "@/lib/mockdb";
+import { User } from "@/types";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    role: "admin"
-  });
+  const [users, setUsers] = useState<User[]>([]);
+  const router = useRouter();
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
+
+  const loadUsers = () => {
+    const dbUsers = db.getUsers();
+    setUsers(dbUsers);
+  };
 
   const columns: Column[] = [
     {
       key: "name",
       label: "Name",
+      filterable: true,
       render: (value, row) => (
         <div>
           <div className="font-medium text-gray-900">{value}</div>
@@ -67,201 +35,116 @@ export default function UsersPage() {
     {
       key: "role",
       label: "Role",
+      filterable: true,
+      filterType: "select",
+      filterOptions: [
+        { value: "superadmin", label: "Superadmin" },
+        { value: "admin", label: "Admin" }
+      ],
       render: (value) => (
         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
           value === 'superadmin' 
             ? 'bg-purple-100 text-purple-800' 
             : 'bg-blue-100 text-blue-800'
         }`}>
-          {value === 'superadmin' ? '👑 Superadmin' : '🛡️ Admin'}
+          {value === 'superadmin' ? 'Super Admin' : 'Admin'}
         </span>
       )
     },
     {
-      key: "status",
+      key: "isActive",
       label: "Status",
+      filterable: true,
+      filterType: "select",
+      filterOptions: [
+        { value: "true", label: "Active" },
+        { value: "false", label: "Inactive" }
+      ],
       render: (value) => (
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          value === 'active' 
-            ? 'bg-green-100 text-green-800' 
-            : 'bg-red-100 text-red-800'
+        <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+          value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
         }`}>
-          {value === 'active' ? '✅ Active' : '❌ Inactive'}
+          <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
+            value ? 'bg-green-400' : 'bg-red-400'
+          }`}></span>
+          {value ? 'Active' : 'Inactive'}
         </span>
       )
     },
     {
       key: "lastLogin",
       label: "Last Login",
-      render: (value) => new Date(value).toLocaleDateString('id-ID', {
+      render: (value) => value ? new Date(value).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'short', 
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
-      })
+      }) : (
+        <span className="text-gray-400 text-sm">Never logged in</span>
+      )
+    },
+    {
+      key: "actions",
+      label: "Actions",
+      render: (_, row) => (
+        <div className="flex space-x-2">
+          <button
+            onClick={() => handleEdit(row)}
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </button>
+          <button
+            onClick={() => handleDelete(row)}
+            className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
+          >
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+        </div>
+      )
     }
   ];
 
-  const handleAdd = () => {
-    setFormData({ name: "", email: "", role: "admin" });
-    setEditingUser(null);
-    setShowAddModal(true);
+  const handleView = (user: User) => {
+    router.push(`/admin/users/${user.id}`);
   };
 
   const handleEdit = (user: User) => {
-    setFormData({
-      name: user.name,
-      email: user.email,
-      role: user.role
-    });
-    setEditingUser(user);
-    setShowAddModal(true);
+    router.push(`/admin/users/${user.id}/edit`);
   };
 
   const handleDelete = (user: User) => {
     if (confirm(`Are you sure you want to delete ${user.name}?`)) {
-      setUsers(users.filter(u => u.id !== user.id));
+      const success = db.deleteUser(user.id);
+      if (success) {
+        loadUsers();
+      }
     }
-  };
-
-  const handleSave = () => {
-    if (editingUser) {
-      // Edit existing user
-      setUsers(users.map(u => 
-        u.id === editingUser.id 
-          ? { ...u, ...formData }
-          : u
-      ));
-    } else {
-      // Add new user
-      const newUser: User = {
-        id: Math.max(...users.map(u => u.id)) + 1,
-        ...formData,
-        lastLogin: new Date().toISOString(),
-        status: 'active'
-      };
-      setUsers([...users, newUser]);
-    }
-    setShowAddModal(false);
   };
 
   return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">👥 User Management</h1>
-            <p className="text-gray-600 mt-2">Kelola pengguna admin dan superadmin</p>
-          </div>
-          <Button onClick={handleAdd}>
-            ➕ Add User
-          </Button>
-        </div>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <span className="text-blue-600 text-2xl">👥</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Total Users</h3>
-              <p className="text-3xl font-bold text-blue-600">{users.length}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <span className="text-purple-600 text-2xl">👑</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Superadmins</h3>
-              <p className="text-3xl font-bold text-purple-600">
-                {users.filter(u => u.role === 'superadmin').length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-green-100 rounded-lg">
-              <span className="text-green-600 text-2xl">✅</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-lg font-semibold text-gray-900">Active Users</h3>
-              <p className="text-3xl font-bold text-green-600">
-                {users.filter(u => u.status === 'active').length}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Users Table */}
+    <BaseIndexForm
+      title="User Management"
+      subtitle="Manage admin and super admin users with comprehensive permissions"
+      createUrl="/admin/users/create/edit"
+      createLabel="Create New User"
+    >
       <DataTable
         columns={columns}
         data={users}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
         searchable={true}
         sortable={true}
         pagination={true}
         pageSize={10}
+        pageSizeOptions={[5, 10, 25, 50]}
       />
-
-      {/* Add/Edit User Modal */}
-      <Modal 
-        isOpen={showAddModal} 
-        onClose={() => setShowAddModal(false)}
-        title={editingUser ? "Edit User" : "Add New User"}
-        size="md"
-      >
-        <div className="space-y-4">
-          <FormField label="Name" required>
-            <TextField
-              value={formData.name}
-              onChange={(value) => setFormData({...formData, name: value})}
-              placeholder="Enter user name"
-            />
-          </FormField>
-          
-          <FormField label="Email" required>
-            <TextField
-              type="email"
-              value={formData.email}
-              onChange={(value) => setFormData({...formData, email: value})}
-              placeholder="Enter email address"
-            />
-          </FormField>
-          
-          <FormField label="Role" required>
-            <Select
-              value={formData.role}
-              onChange={(value) => setFormData({...formData, role: value})}
-              options={[
-                { value: "admin", label: "Admin" },
-                { value: "superadmin", label: "Superadmin" }
-              ]}
-            />
-          </FormField>
-          
-          <div className="flex space-x-3 pt-4">
-            <Button variant="secondary" onClick={() => setShowAddModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleSave}>
-              {editingUser ? "Update" : "Add"} User
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </div>
+    </BaseIndexForm>
   );
 }

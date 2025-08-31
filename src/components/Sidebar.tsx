@@ -80,16 +80,6 @@ export function Sidebar({ onLogout }: SidebarProps) {
         <p className="text-sm text-gray-400 mt-1">Logic Test System</p>
       </div>
 
-      {/* Statistics */}
-      <div className="p-4 border-b border-gray-700">
-        <div className="bg-gray-800 rounded-lg p-3">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-400">Total Peserta</span>
-            <span className="text-lg font-bold text-green-400">{totalUsers}</span>
-          </div>
-        </div>
-      </div>
-
       {/* Navigation Menu */}
       <nav className="flex-1 px-4 py-6">
         <ul className="space-y-2">

@@ -1,3 +1,14 @@
+// Base model with standard columns
+export interface BaseModel {
+  id: string;
+  createdAt: string;
+  updatedAt?: string;
+  createdBy?: string;
+  updatedBy?: string;
+  isActive: boolean;
+  status?: string; // Don't use this yet as per request
+}
+
 export type Question = {
   id: string;
   order: number;
@@ -41,27 +52,21 @@ export type Quiz = {
   questionsPerPage: number; // pagination setting
 };
 
-// Admin types
-export type User = {
-  id: string;
+// Admin types with BaseModel
+export interface User extends BaseModel {
   email: string;
   name: string;
   role: 'admin' | 'superadmin';
-  createdAt: string;
   lastLogin?: string;
-};
+}
 
-export type ConfigItem = {
-  id: string;
+export interface ConfigItem extends BaseModel {
   group: string;
   key: string;
   value: string;
   description?: string;
   order?: number;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-};
+}
 
 // Add more standardized types as needed
 export type AdminStats = {
