@@ -13,6 +13,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [user] = useState({
     name: "Demo Administrator",
     email: "admin@example.com",
@@ -34,15 +35,40 @@ export default function AdminLayout({
       }
     };
 
+    // Close sidebar when clicking outside on mobile
+    const handleSidebarOutside = (event: MouseEvent) => {
+      const target = event.target as Element;
+      if (sidebarOpen && !target.closest('.sidebar') && !target.closest('.mobile-menu-button')) {
+        setSidebarOpen(false);
+      }
+    };
+
     if (showProfileMenu) {
       document.addEventListener('click', handleClickOutside);
-      return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [showProfileMenu]);
+    
+    if (sidebarOpen) {
+      document.addEventListener('click', handleSidebarOutside);
+      // Prevent body scroll when sidebar is open on mobile
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+      document.removeEventListener('click', handleSidebarOutside);
+      document.body.style.overflow = 'unset';
+    };
+  }, [showProfileMenu, sidebarOpen]);
 
   const handleLogout = () => {
     // Simply redirect to admin sign in
     router.push('/admin');
+  };
+
+  const toggleSidebar = () => {
+    setSidebarOpen(!sidebarOpen);
   };
 
   // For sign in pages, render without layout
@@ -60,13 +86,33 @@ export default function AdminLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <Sidebar onLogout={handleLogout} />
-      <div className="flex-1 flex flex-col">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 lg:hidden backdrop-blur-sm"></div>
+      )}
+      
+      <Sidebar 
+        onLogout={handleLogout} 
+        isOpen={sidebarOpen} 
+        onClose={() => setSidebarOpen(false)} 
+      />
+      <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+        <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 relative z-30">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-xl font-semibold text-gray-900">Admin Panel</h1>
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              {/* Mobile menu button */}
+              <button
+                onClick={toggleSidebar}
+                className="lg:hidden mobile-menu-button p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">Admin Panel</h1>
+              </div>
             </div>
             
             {/* Profile and Logout */}
@@ -129,7 +175,7 @@ export default function AdminLayout({
 
         {/* Main Content */}
         <main className="flex-1 overflow-auto">
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             {children}
           </div>
         </main>

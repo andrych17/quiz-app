@@ -47,7 +47,7 @@ export function TextField({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       disabled={disabled}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${className}`}
+      className={`w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-base sm:text-sm ${className}`}
     />
   );
 }
@@ -76,7 +76,7 @@ export function TextArea({
       placeholder={placeholder}
       rows={rows}
       disabled={disabled}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-vertical ${className}`}
+      className={`w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed resize-vertical text-base sm:text-sm ${className}`}
     />
   );
 }
@@ -108,7 +108,7 @@ export function Select({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className={`w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed ${className}`}
+      className={`w-full px-3 py-2.5 sm:py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-base sm:text-sm ${className}`}
     >
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((option) => (
@@ -151,9 +151,9 @@ export function Button({
   };
 
   const sizeClasses = {
-    sm: "px-3 py-1.5 text-sm",
-    md: "px-4 py-2 text-sm",
-    lg: "px-6 py-3 text-base"
+    sm: "px-2 sm:px-3 py-1.5 text-xs sm:text-sm",
+    md: "px-3 sm:px-4 py-2 text-sm",
+    lg: "px-4 sm:px-6 py-2.5 sm:py-3 text-sm sm:text-base"
   };
 
   return (

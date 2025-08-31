@@ -150,9 +150,9 @@ export default function DataTable({
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
       {/* Modern Header with Search and Controls */}
       <div className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-        <div className="p-6">
+        <div className="p-4 sm:p-6">
           {/* Top Controls Row */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between space-y-4 lg:space-y-0 lg:space-x-4">
+          <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0 lg:space-x-4">
             {/* Search Section */}
             {searchable && (
               <div className="flex-1 max-w-md">
@@ -190,66 +190,69 @@ export default function DataTable({
             )}
             
             {/* Right Controls */}
-            <div className="flex items-center space-x-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center space-y-3 sm:space-y-0 sm:space-x-3">
               {/* Results Info */}
-              <div className="text-sm text-gray-600 hidden sm:block">
+              <div className="text-sm text-gray-600">
                 {sortedData.length} {sortedData.length === 1 ? 'result' : 'results'}
                 {(searchTerm || Object.values(columnFilters).some(v => v)) && (
                   <span className="text-blue-600 font-medium"> (filtered)</span>
                 )}
               </div>
 
-              {/* Page Size Selector */}
-              {pagination && (
-                <div className="flex items-center space-x-2">
-                  <label className="text-sm text-gray-600 whitespace-nowrap">Show:</label>
-                  <select
-                    value={currentPageSize}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              {/* Controls Row */}
+              <div className="flex items-center space-x-3">
+                {/* Page Size Selector */}
+                {pagination && (
+                  <div className="flex items-center space-x-2">
+                    <label className="text-sm text-gray-600 whitespace-nowrap hidden sm:block">Show:</label>
+                    <select
+                      value={currentPageSize}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="border border-gray-300 rounded-md px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    >
+                      {pageSizeOptions.map(size => (
+                        <option key={size} value={size}>{size}</option>
+                      ))}
+                    </select>
+                    <span className="text-sm text-gray-600 whitespace-nowrap hidden sm:block">per page</span>
+                  </div>
+                )}
+                
+                {/* Filter Toggle */}
+                {columns.some(col => col.filterable) && (
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className={`inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium transition-all ${
+                      showFilters || Object.values(columnFilters).some(v => v)
+                        ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' 
+                        : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500`}
                   >
-                    {pageSizeOptions.map(size => (
-                      <option key={size} value={size}>{size}</option>
-                    ))}
-                  </select>
-                  <span className="text-sm text-gray-600 whitespace-nowrap">per page</span>
-                </div>
-              )}
-              
-              {/* Filter Toggle */}
-              {columns.some(col => col.filterable) && (
-                <button
-                  onClick={() => setShowFilters(!showFilters)}
-                  className={`inline-flex items-center px-3 py-2 border rounded-md text-sm font-medium transition-all ${
-                    showFilters || Object.values(columnFilters).some(v => v)
-                      ? 'border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100' 
-                      : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
-                  } focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                >
-                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.586l-4-2v-2.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-                  </svg>
-                  Filters
-                  {Object.values(columnFilters).filter(v => v).length > 0 && (
-                    <span className="ml-1.5 bg-blue-100 text-blue-800 text-xs rounded-full px-2 py-0.5">
-                      {Object.values(columnFilters).filter(v => v).length}
-                    </span>
-                  )}
-                </button>
-              )}
-              
-              {/* Clear All Filters */}
-              {(Object.values(columnFilters).some(v => v) || searchTerm) && (
-                <button
-                  onClick={clearAllFilters}
-                  className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
-                >
-                  <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                  Clear
-                </button>
-              )}
+                    <svg className="h-4 w-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707v4.586l-4-2v-2.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                    </svg>
+                    <span className="hidden sm:inline">Filters</span>
+                    {Object.values(columnFilters).filter(v => v).length > 0 && (
+                      <span className="ml-1.5 bg-blue-100 text-blue-800 text-xs rounded-full px-2 py-0.5">
+                        {Object.values(columnFilters).filter(v => v).length}
+                      </span>
+                    )}
+                  </button>
+                )}
+                
+                {/* Clear All Filters */}
+                {(Object.values(columnFilters).some(v => v) || searchTerm) && (
+                  <button
+                    onClick={clearAllFilters}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors"
+                  >
+                    <svg className="h-4 w-4 sm:mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span className="hidden sm:inline">Clear</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
           
@@ -318,15 +321,15 @@ export default function DataTable({
               {columns.map((column) => (
                 <th
                   key={column.key}
-                  className={`px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider ${
+                  className={`px-3 sm:px-6 py-3 sm:py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider ${
                     column.sortable !== false && sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
                   }`}
                   onClick={() => column.sortable !== false && handleSort(column.key)}
                 >
                   <div className="flex items-center space-x-1">
-                    <span>{column.label}</span>
+                    <span className="truncate">{column.label}</span>
                     {column.sortable !== false && sortable && (
-                      <div className="flex flex-col">
+                      <div className="flex flex-col flex-shrink-0">
                         {sortColumn === column.key ? (
                           sortDirection === 'asc' ? (
                             <svg className="h-4 w-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,7 +351,7 @@ export default function DataTable({
                 </th>
               ))}
               {(onEdit || onDelete) && (
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                <th className="px-3 sm:px-6 py-3 sm:py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">
                   Actions
                 </th>
               )}
@@ -362,27 +365,29 @@ export default function DataTable({
                 onClick={() => onRowClick && onRowClick(row)}
               >
                 {columns.map((column) => (
-                  <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {column.render ? column.render(row[column.key], row) : (
-                      <span className="text-gray-900">{String(row[column.key] ?? '')}</span>
-                    )}
+                  <td key={column.key} className="px-3 sm:px-6 py-3 sm:py-4 text-sm text-gray-900">
+                    <div className="truncate max-w-xs">
+                      {column.render ? column.render(row[column.key], row) : (
+                        <span className="text-gray-900">{String(row[column.key] ?? '')}</span>
+                      )}
+                    </div>
                   </td>
                 ))}
                 {(onEdit || onDelete) && (
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex justify-end space-x-2">
+                  <td className="px-3 sm:px-6 py-3 sm:py-4 text-right text-sm font-medium">
+                    <div className="flex justify-end space-x-1 sm:space-x-2">
                       {onEdit && (
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onEdit(row);
                           }}
-                          className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
+                          className="inline-flex items-center px-2 sm:px-2.5 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded-md hover:bg-blue-200 transition-colors"
                         >
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </svg>
-                          Edit
+                          <span className="hidden sm:inline">Edit</span>
                         </button>
                       )}
                       {onDelete && (
@@ -391,12 +396,12 @@ export default function DataTable({
                             e.stopPropagation();
                             onDelete(row);
                           }}
-                          className="inline-flex items-center px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
+                          className="inline-flex items-center px-2 sm:px-2.5 py-1.5 text-xs font-medium text-red-700 bg-red-100 rounded-md hover:bg-red-200 transition-colors"
                         >
-                          <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-3 h-3 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                          Delete
+                          <span className="hidden sm:inline">Delete</span>
                         </button>
                       )}
                     </div>
@@ -430,31 +435,36 @@ export default function DataTable({
       {/* Modern Pagination */}
       {pagination && totalPages > 1 && (
         <div className="bg-white border-t border-gray-200">
-          <div className="px-6 py-4">
+          <div className="px-4 py-3 sm:px-6 sm:py-4">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0">
               {/* Results Summary */}
-              <div className="flex items-center text-sm text-gray-700">
-                <span>
+              <div className="flex items-center text-sm text-gray-700 order-2 sm:order-1">
+                <span className="hidden sm:inline">
                   Showing <span className="font-semibold text-gray-900">{startIndex + 1}</span> to{' '}
                   <span className="font-semibold text-gray-900">
                     {Math.min(startIndex + currentPageSize, sortedData.length)}
                   </span>{' '}
                   of <span className="font-semibold text-gray-900">{sortedData.length}</span> results
                 </span>
+                <span className="sm:hidden">
+                  <span className="font-semibold text-gray-900">{startIndex + 1}</span>-<span className="font-semibold text-gray-900">
+                    {Math.min(startIndex + currentPageSize, sortedData.length)}
+                  </span> of <span className="font-semibold text-gray-900">{sortedData.length}</span>
+                </span>
               </div>
 
               {/* Pagination Controls */}
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center justify-center space-x-1 sm:space-x-2 order-1 sm:order-2">
                 {/* Previous Button */}
                 <button
                   onClick={() => handlePageChange(currentPage - 1)}
                   disabled={currentPage === 1}
-                  className="relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="relative inline-flex items-center px-2 sm:px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="h-4 w-4 sm:mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                   </svg>
-                  Previous
+                  <span className="hidden sm:inline">Previous</span>
                 </button>
 
                 {/* Page Numbers */}
@@ -534,10 +544,10 @@ export default function DataTable({
                 <button
                   onClick={() => handlePageChange(currentPage + 1)}
                   disabled={currentPage === totalPages}
-                  className="relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="relative inline-flex items-center px-2 sm:px-3 py-2 text-sm font-medium rounded-md border border-gray-300 bg-white text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
-                  Next
-                  <svg className="h-4 w-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <span className="hidden sm:inline">Next</span>
+                  <svg className="h-4 w-4 sm:ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>

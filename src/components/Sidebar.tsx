@@ -5,9 +5,11 @@ import { usePathname } from "next/navigation";
 
 interface SidebarProps {
   onLogout: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
-export function Sidebar({ onLogout }: SidebarProps) {
+export function Sidebar({ onLogout, isOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
 
   const menuItems = [
@@ -56,30 +58,61 @@ export function Sidebar({ onLogout }: SidebarProps) {
   ];
 
   return (
-    <div className="bg-gray-900 text-white w-64 min-h-screen flex flex-col">
+    <div className={`sidebar bg-white border-r border-gray-200 shadow-lg w-64 min-h-screen flex flex-col fixed lg:static inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out ${
+      isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+    }`}>
+      {/* Close button for mobile */}
+      {onClose && (
+        <div className="lg:hidden flex justify-end p-4 border-b border-gray-100">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700 p-1 rounded-md hover:bg-gray-100"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+      
       {/* Header */}
-      <div className="p-6 border-b border-gray-700">
-        <h2 className="text-xl font-bold text-blue-400">GMS Admin</h2>
-        <p className="text-sm text-gray-400 mt-1">Logic Test System</p>
+      <div className={`p-6 border-b border-gray-100 ${onClose ? 'pt-2' : ''}`}>
+        <div className="flex items-center space-x-3">
+          <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+            <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-gray-900">GMS Admin</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Logic Test System</p>
+          </div>
+        </div>
       </div>
 
       {/* Navigation Menu */}
       <nav className="flex-1 px-4 py-6">
-        <ul className="space-y-2">
+        <ul className="space-y-1">
           {menuItems.map((item) => {
             const isActive = pathname === item.href;
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                  onClick={onClose} // Close sidebar on mobile when navigating
+                  className={`flex items-center space-x-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 ${
                     isActive
-                      ? "bg-blue-600 text-white"
-                      : "text-gray-300 hover:bg-gray-800 hover:text-white"
+                      ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg shadow-blue-500/25"
+                      : "text-gray-700 hover:bg-gray-50 hover:text-gray-900"
                   }`}
                 >
-                  {item.icon}
+                  <span className={`${isActive ? 'text-white' : 'text-gray-500'}`}>
+                    {item.icon}
+                  </span>
                   <span>{item.label}</span>
+                  {isActive && (
+                    <div className="ml-auto w-2 h-2 bg-white rounded-full"></div>
+                  )}
                 </Link>
               </li>
             );
@@ -88,19 +121,19 @@ export function Sidebar({ onLogout }: SidebarProps) {
       </nav>
 
       {/* Footer - Logout */}
-      <div className="p-4 border-t border-gray-700">
+      <div className="p-4 border-t border-gray-100 bg-gray-50/50">
         <button
           onClick={onLogout}
-          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-colors"
+          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-700 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200 text-sm font-medium group"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-5 h-5 text-gray-500 group-hover:text-red-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
                   d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           <span>Logout</span>
         </button>
-        <div className="text-center text-xs text-gray-500 mt-3">
-          Logic Test System
+        <div className="text-center text-xs text-gray-400 mt-4 font-medium">
+          © 2025 Logic Test System
         </div>
       </div>
     </div>
