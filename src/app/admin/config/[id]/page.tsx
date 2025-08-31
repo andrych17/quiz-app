@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BaseForm } from "@/components/ui/common/BaseForm";
 import { ConfigItem } from "@/types";
@@ -94,16 +94,7 @@ function ConfigDetailContent({ id }: { id: string }) {
 
   const isCreateMode = id === "new";
 
-  useEffect(() => {
-    if (isCreateMode) {
-      setIsEditMode(true);
-      setLoading(false);
-    } else {
-      loadConfig();
-    }
-  }, [id, isCreateMode]);
-
-  const loadConfig = () => {
+  const loadConfig = useCallback(() => {
     setLoading(true);
     try {
       const decryptedId = decryptId(id);
@@ -123,7 +114,16 @@ function ConfigDetailContent({ id }: { id: string }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (isCreateMode) {
+      setIsEditMode(true);
+      setLoading(false);
+    } else {
+      loadConfig();
+    }
+  }, [id, isCreateMode, loadConfig]);
 
   const handleSave = async () => {
     if (isCreateMode) {
@@ -207,7 +207,7 @@ function ConfigDetailContent({ id }: { id: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
           </svg>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Configuration Not Found</h2>
-          <p className="text-gray-600">The configuration you're looking for doesn't exist.</p>
+          <p className="text-gray-600">The configuration you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </BaseForm>
     );
@@ -320,7 +320,7 @@ function ConfigDetailContent({ id }: { id: string }) {
               <li>• Use lowercase with underscores for configuration keys (e.g., pelayanan_anak)</li>
               <li>• Choose appropriate groups to organize related configurations</li>
               <li>• Display values should be user-friendly and descriptive</li>
-              <li>• Inactive configurations won't appear in dropdowns or selections</li>
+              <li>• Inactive configurations won&apos;t appear in dropdowns or selections</li>
             </ul>
           </div>
         </div>
@@ -487,7 +487,24 @@ function ConfigDetailContent({ id }: { id: string }) {
   );
 }
 
-export default async function ConfigDetailPage({ params }: PageProps) {
-  const { id } = await params;
+export default function ConfigDetailPage({ params }: PageProps) {
+  const [id, setId] = useState<string>("");
+  
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
+  
+  if (!id) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
   return <ConfigDetailContent id={id} />;
 }

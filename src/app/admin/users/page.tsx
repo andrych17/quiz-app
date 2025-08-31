@@ -27,8 +27,8 @@ export default function UsersPage() {
       filterable: true,
       render: (value, row) => (
         <div>
-          <div className="font-medium text-gray-900">{value}</div>
-          <div className="text-sm text-gray-500">{row.email}</div>
+          <div className="font-medium text-gray-900">{String(value)}</div>
+          <div className="text-sm text-gray-500">{String((row as Record<string, unknown>).email)}</div>
         </div>
       )
     },
@@ -43,11 +43,11 @@ export default function UsersPage() {
       ],
       render: (value) => (
         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          value === 'superadmin' 
+          String(value) === 'superadmin' 
             ? 'bg-purple-100 text-purple-800' 
             : 'bg-blue-100 text-blue-800'
         }`}>
-          {value === 'superadmin' ? 'Super Admin' : 'Admin'}
+          {String(value) === 'superadmin' ? 'Super Admin' : 'Admin'}
         </span>
       )
     },
@@ -62,19 +62,19 @@ export default function UsersPage() {
       ],
       render: (value) => (
         <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-          value ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          Boolean(value) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
         }`}>
           <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
-            value ? 'bg-green-400' : 'bg-red-400'
+            Boolean(value) ? 'bg-green-400' : 'bg-red-400'
           }`}></span>
-          {value ? 'Active' : 'Inactive'}
+          {Boolean(value) ? 'Active' : 'Inactive'}
         </span>
       )
     },
     {
       key: "lastLogin",
       label: "Last Login",
-      render: (value) => value ? new Date(value).toLocaleDateString('id-ID', {
+      render: (value) => value ? new Date(String(value)).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'short', 
         day: 'numeric',
@@ -90,7 +90,7 @@ export default function UsersPage() {
       render: (_, row) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEdit(row)}
+            onClick={() => handleEdit(row as unknown as User)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -99,7 +99,7 @@ export default function UsersPage() {
             Edit
           </button>
           <button
-            onClick={() => handleDelete(row)}
+            onClick={() => handleDelete(row as unknown as User)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -111,10 +111,6 @@ export default function UsersPage() {
       )
     }
   ];
-
-  const handleView = (user: User) => {
-    router.push(`/admin/users/${user.id}`);
-  };
 
   const handleEdit = (user: User) => {
     router.push(`/admin/users/${user.id}/edit`);
@@ -138,7 +134,7 @@ export default function UsersPage() {
     >
       <DataTable
         columns={columns}
-        data={users}
+        data={users as unknown as Record<string, unknown>[]}
         searchable={true}
         sortable={true}
         pagination={true}

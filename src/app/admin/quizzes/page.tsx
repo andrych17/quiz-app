@@ -27,9 +27,9 @@ export default function QuizzesPage() {
       filterable: true,
       render: (value, row) => (
         <div>
-          <div className="font-medium text-gray-900">{value}</div>
+          <div className="font-medium text-gray-900">{String(value)}</div>
           <div className="text-sm text-gray-500">
-            {row.questions.length} questions • Created by {row.createdBy}
+            {Array.isArray((row as Record<string, unknown>).questions) ? ((row as Record<string, unknown>).questions as unknown[]).length : 0} questions • Created by {String((row as Record<string, unknown>).createdBy || 'Unknown')}
           </div>
         </div>
       )
@@ -45,12 +45,12 @@ export default function QuizzesPage() {
       ],
       render: (value) => (
         <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-          value ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+          Boolean(value) ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
         }`}>
           <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
-            value ? 'bg-green-400' : 'bg-yellow-400'
+            Boolean(value) ? 'bg-green-400' : 'bg-yellow-400'
           }`}></span>
-          {value ? 'Published' : 'Draft'}
+          {Boolean(value) ? 'Published' : 'Draft'}
         </span>
       )
     },
@@ -59,7 +59,7 @@ export default function QuizzesPage() {
       label: "Questions",
       render: (value) => (
         <div className="text-center">
-          <div className="text-sm font-medium">{value.length}</div>
+          <div className="text-sm font-medium">{Array.isArray(value) ? value.length : 0}</div>
           <div className="text-xs text-gray-500">questions</div>
         </div>
       )
@@ -69,7 +69,7 @@ export default function QuizzesPage() {
       label: "Participants",
       render: (value) => (
         <div className="text-center">
-          <div className="text-sm font-medium">{value.length}</div>
+          <div className="text-sm font-medium">{Array.isArray(value) ? value.length : 0}</div>
           <div className="text-xs text-gray-500">participants</div>
         </div>
       )
@@ -79,10 +79,11 @@ export default function QuizzesPage() {
       label: "Expires",
       render: (value) => {
         if (!value) return <span className="text-gray-400 text-sm">No expiry</span>;
-        const isExpired = new Date(value) < new Date();
+        const dateValue = String(value);
+        const isExpired = new Date(dateValue) < new Date();
         return (
           <div className={`text-sm ${isExpired ? 'text-red-600' : 'text-gray-900'}`}>
-            {new Date(value).toLocaleDateString('id-ID', {
+            {new Date(dateValue).toLocaleDateString('id-ID', {
               year: 'numeric',
               month: 'short',
               day: 'numeric'
@@ -97,7 +98,7 @@ export default function QuizzesPage() {
     {
       key: "createdAt",
       label: "Created",
-      render: (value) => new Date(value).toLocaleDateString('id-ID', {
+      render: (value) => new Date(String(value)).toLocaleDateString('id-ID', {
         year: 'numeric',
         month: 'short',
         day: 'numeric'
@@ -109,7 +110,7 @@ export default function QuizzesPage() {
       render: (_, row) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEdit(row)}
+            onClick={() => handleEdit(row as unknown as Quiz)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,7 +119,7 @@ export default function QuizzesPage() {
             Edit
           </button>
           <button
-            onClick={() => handleDelete(row)}
+            onClick={() => handleDelete(row as unknown as Quiz)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,10 +131,6 @@ export default function QuizzesPage() {
       )
     }
   ];
-
-  const handleView = (quiz: Quiz) => {
-    router.push(`/admin/quizzes/${quiz.id}`);
-  };
 
   const handleEdit = (quiz: Quiz) => {
     router.push(`/admin/quizzes/${quiz.id}/edit`);
@@ -157,7 +154,7 @@ export default function QuizzesPage() {
     >
       <DataTable
         columns={columns}
-        data={quizzes}
+        data={quizzes as unknown as Record<string, unknown>[]}
         searchable={true}
         sortable={true}
         pagination={true}

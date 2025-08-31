@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 
+// Define a generic data type for table rows
+type TableRow = Record<string, unknown>;
+
 export interface Column {
   key: string;
   label: string;
@@ -9,20 +12,20 @@ export interface Column {
   filterable?: boolean;
   filterType?: 'text' | 'select';
   filterOptions?: { value: string; label: string }[];
-  render?: (value: any, row: any) => React.ReactNode;
+  render?: (value: unknown, row: TableRow) => React.ReactNode;
 }
 
 export interface DataTableProps {
   columns: Column[];
-  data: any[];
+  data: TableRow[];
   searchable?: boolean;
   sortable?: boolean;
   pagination?: boolean;
   pageSize?: number;
   pageSizeOptions?: number[];
-  onRowClick?: (row: any) => void;
-  onEdit?: (row: any) => void;
-  onDelete?: (row: any) => void;
+  onRowClick?: (row: TableRow) => void;
+  onEdit?: (row: TableRow) => void;
+  onDelete?: (row: TableRow) => void;
   loading?: boolean;
 }
 
@@ -87,8 +90,16 @@ export default function DataTable({
     const aValue = a[sortColumn];
     const bValue = b[sortColumn];
     
-    if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
-    if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    // Type guard for sortable values
+    const isComparable = (value: unknown): value is string | number => {
+      return typeof value === 'string' || typeof value === 'number';
+    };
+    
+    if (isComparable(aValue) && isComparable(bValue)) {
+      if (aValue < bValue) return sortDirection === 'asc' ? -1 : 1;
+      if (aValue > bValue) return sortDirection === 'asc' ? 1 : -1;
+    }
+    
     return 0;
   });
 
@@ -353,7 +364,7 @@ export default function DataTable({
                 {columns.map((column) => (
                   <td key={column.key} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {column.render ? column.render(row[column.key], row) : (
-                      <span className="text-gray-900">{row[column.key]}</span>
+                      <span className="text-gray-900">{String(row[column.key] ?? '')}</span>
                     )}
                   </td>
                 ))}
@@ -452,7 +463,7 @@ export default function DataTable({
                     const pageNumbers = [];
                     const maxVisiblePages = 7;
                     let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-                    let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+                    const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
                     
                     if (endPage - startPage < maxVisiblePages - 1) {
                       startPage = Math.max(1, endPage - maxVisiblePages + 1);

@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 
 export default function AdminDashboard() {
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     totalQuizzes: 5,
     totalUsers: 3,
     totalParticipants: 47,
@@ -12,7 +12,7 @@ export default function AdminDashboard() {
     avgScore: 85.6
   });
 
-  const [recentActivity, setRecentActivity] = useState([
+  const [recentActivity] = useState([
     { id: 1, type: "quiz_completed", user: "Alice Johnson", quiz: "Logic Test - Pelayanan Anak", time: "2 minutes ago", score: 92 },
     { id: 2, type: "new_participant", user: "Bob Smith", quiz: "Leadership Assessment", time: "15 minutes ago", score: null },
     { id: 3, type: "quiz_completed", user: "Carol Wilson", quiz: "Ministry Evaluation", time: "1 hour ago", score: 78 },

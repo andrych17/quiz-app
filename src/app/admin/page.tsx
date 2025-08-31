@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-export default function AdminSignIn() {
+import Link from "next/link";
+
+export default function AdminHomePage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -105,12 +107,12 @@ export default function AdminSignIn() {
 
         {/* Back to Home */}
         <div className="text-center mt-6">
-          <a 
+          <Link 
             href="/"
             className="text-gray-600 hover:text-gray-800 transition-colors text-sm"
           >
             ← Back to Home
-          </a>
+          </Link>
         </div>
       </div>
     </div>

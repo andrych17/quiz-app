@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BaseEditForm } from "@/components/ui/common/BaseEditForm";
 import { FormField, TextField, TextArea, Select } from "@/components/ui/common/FormControls";
@@ -51,15 +51,7 @@ function QuizEditContent({ quizId }: { quizId: string }) {
 
   const isCreateMode = quizId === 'create';
 
-  useEffect(() => {
-    if (isCreateMode) {
-      setLoading(false);
-    } else {
-      loadQuiz();
-    }
-  }, [quizId, isCreateMode]);
-
-  const loadQuiz = async () => {
+  const loadQuiz = useCallback(async () => {
     setLoading(true);
     try {
       const foundQuiz = db.getQuizById(quizId);
@@ -77,7 +69,15 @@ function QuizEditContent({ quizId }: { quizId: string }) {
       console.error("Error loading quiz:", error);
     }
     setLoading(false);
-  };
+  }, [quizId]);
+
+  useEffect(() => {
+    if (isCreateMode) {
+      setLoading(false);
+    } else {
+      loadQuiz();
+    }
+  }, [quizId, isCreateMode, loadQuiz]);
 
   const handleSave = async () => {
     if (!formData.title.trim()) {
@@ -227,7 +227,7 @@ function QuizEditContent({ quizId }: { quizId: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
           </svg>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">Quiz Not Found</h2>
-          <p className="text-gray-600">The quiz you're looking for doesn't exist.</p>
+          <p className="text-gray-600">The quiz you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </BaseEditForm>
     );
@@ -628,7 +628,24 @@ function QuizEditContent({ quizId }: { quizId: string }) {
   );
 }
 
-export default async function QuizEditPage({ params }: PageProps) {
-  const { id } = await params;
-  return <QuizEditContent quizId={id} />;
+export default function QuizEditPage({ params }: PageProps) {
+  const [quizId, setQuizId] = useState<string>("");
+  
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setQuizId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
+  
+  if (!quizId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  return <QuizEditContent quizId={quizId} />;
 }

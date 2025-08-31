@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 interface SidebarProps {
   onLogout: () => void;
@@ -10,22 +9,6 @@ interface SidebarProps {
 
 export function Sidebar({ onLogout }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const [totalUsers, setTotalUsers] = useState(0);
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch('/api/admin/stats');
-        const data = await response.json();
-        setTotalUsers(data.totalUsers || 0);
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      }
-    };
-
-    fetchStats();
-  }, []);
 
   const menuItems = [
     {
@@ -104,9 +87,19 @@ export function Sidebar({ onLogout }: SidebarProps) {
         </ul>
       </nav>
 
-      {/* Footer - Static */}
+      {/* Footer - Logout */}
       <div className="p-4 border-t border-gray-700">
-        <div className="text-center text-xs text-gray-500">
+        <button
+          onClick={onLogout}
+          className="w-full flex items-center space-x-3 px-4 py-3 text-gray-300 hover:bg-gray-800 hover:text-white rounded-lg transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                  d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+          <span>Logout</span>
+        </button>
+        <div className="text-center text-xs text-gray-500 mt-3">
           Logic Test System
         </div>
       </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { db } from "@/lib/mockdb";
 import { isExpired } from "@/lib/date";
@@ -23,7 +22,6 @@ function QuizDetailContent({ id }: { id: string }) {
   const [quizTitle, setQuizTitle] = useState("");
   const [quizExpiry, setQuizExpiry] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
   const loadQuiz = useCallback(() => {
     const loadedQuiz = db.getQuizById(id);
@@ -524,7 +522,24 @@ function QuizDetailContent({ id }: { id: string }) {
   );
 }
 
-export default async function QuizDetailPage({ params }: PageProps) {
-  const { id } = await params;
+export default function QuizDetailPage({ params }: PageProps) {
+  const [id, setId] = useState<string>("");
+  
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
+  
+  if (!id) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
   return <QuizDetailContent id={id} />;
 }

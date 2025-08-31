@@ -161,7 +161,7 @@ export default function ConfigPage() {
           <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7l2 2m0 0l2 2m-2-2l-2-2m-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2z" />
           </svg>
-          {value}
+          {String(value)}
         </span>
       )
     },
@@ -171,7 +171,7 @@ export default function ConfigPage() {
       filterable: true,
       render: (value) => (
         <code className="text-sm font-mono bg-gradient-to-r from-gray-50 to-gray-100 px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
-          {value}
+          {String(value)}
         </code>
       )
     },
@@ -179,14 +179,14 @@ export default function ConfigPage() {
       key: "value",
       label: "Value",
       render: (value) => (
-        <span className="font-semibold text-gray-900 text-sm">{value}</span>
+        <span className="font-semibold text-gray-900 text-sm">{String(value)}</span>
       )
     },
     {
       key: "description",
       label: "Description",
       render: (value) => (
-        <span className="text-sm text-gray-600 line-clamp-2">{value}</span>
+        <span className="text-sm text-gray-600 line-clamp-2">{String(value)}</span>
       )
     },
     {
@@ -200,14 +200,14 @@ export default function ConfigPage() {
       ],
       render: (value) => (
         <span className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg ${
-          value 
+          Boolean(value) 
             ? 'bg-gradient-to-r from-green-50 to-emerald-50 text-green-800 border border-green-200' 
             : 'bg-gradient-to-r from-red-50 to-rose-50 text-red-800 border border-red-200'
         }`}>
           <span className={`w-2 h-2 mr-2 rounded-full ${
-            value ? 'bg-green-400' : 'bg-red-400'
+            Boolean(value) ? 'bg-green-400' : 'bg-red-400'
           }`}></span>
-          {value ? 'Active' : 'Inactive'}
+          {Boolean(value) ? 'Active' : 'Inactive'}
         </span>
       )
     },
@@ -215,23 +215,26 @@ export default function ConfigPage() {
       key: "updatedAt",
       label: "Updated",
       sortable: true,
-      render: (value) => (
-        <div className="text-sm">
-          <div className="font-medium text-gray-900">
-            {new Date(value).toLocaleDateString('id-ID', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })}
+      render: (value) => {
+        const dateValue = String(value);
+        return (
+          <div className="text-sm">
+            <div className="font-medium text-gray-900">
+              {new Date(dateValue).toLocaleDateString('id-ID', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+              })}
+            </div>
+            <div className="text-xs text-gray-500">
+              {new Date(dateValue).toLocaleTimeString('id-ID', {
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </div>
           </div>
-          <div className="text-xs text-gray-500">
-            {new Date(value).toLocaleTimeString('id-ID', {
-              hour: '2-digit',
-              minute: '2-digit'
-            })}
-          </div>
-        </div>
-      )
+        );
+      }
     },
     {
       key: "actions",
@@ -239,7 +242,7 @@ export default function ConfigPage() {
       render: (_, row) => (
         <div className="flex items-center space-x-3">
           <button
-            onClick={() => handleEdit(row)}
+            onClick={() => handleEdit(row as unknown as ConfigItem)}
             className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -248,7 +251,7 @@ export default function ConfigPage() {
             Edit
           </button>
           <button
-            onClick={() => handleDelete(row)}
+            onClick={() => handleDelete(row as unknown as ConfigItem)}
             className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,10 +268,6 @@ export default function ConfigPage() {
     router.push('/admin/config/new');
   };
 
-  const handleView = (config: ConfigItem) => {
-    router.push(`/admin/config/${encryptId(config.id)}`);
-  };
-
   const handleEdit = (config: ConfigItem) => {
     router.push(`/admin/config/${encryptId(config.id)}`);
   };
@@ -278,60 +277,6 @@ export default function ConfigPage() {
       setConfigs(configs.filter(c => c.id !== config.id));
     }
   };
-
-  // Group configs by group name for stats
-  const groupedStats = configs.reduce((acc, config) => {
-    acc[config.group] = (acc[config.group] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const stats = [
-    {
-      title: "Total Configurations",
-      value: configs.length,
-      change: "+12%",
-      changeType: "positive" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-        </svg>
-      )
-    },
-    {
-      title: "Active Items",
-      value: configs.filter(c => c.isActive).length,
-      change: "+5%",
-      changeType: "positive" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    },
-    {
-      title: "Configuration Groups",
-      value: Object.keys(groupedStats).length,
-      change: "0%",
-      changeType: "neutral" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14-7l2 2m0 0l2 2m-2-2l-2-2m-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2z" />
-        </svg>
-      )
-    },
-    {
-      title: "Last Updated",
-      value: "Today",
-      change: "Just now",
-      changeType: "neutral" as const,
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-      )
-    }
-  ];
 
   return (
     <BaseIndexForm
@@ -350,7 +295,7 @@ export default function ConfigPage() {
         <div className="p-6">
           <DataTable
             columns={columns}
-            data={configs}
+            data={configs as unknown as Record<string, unknown>[]}
             searchable={true}
             sortable={true}
             pagination={true}

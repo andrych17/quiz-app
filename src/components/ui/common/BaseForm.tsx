@@ -54,7 +54,7 @@ export function BaseForm({
   encryptedId,
   onSave,
   onDelete,
-  onCancel,
+  // onCancel, // Unused in current implementation
   isEditing = false,
   isSaving = false,
   children,
@@ -64,7 +64,7 @@ export function BaseForm({
   createdBy,
   updatedBy,
   isActive,
-  status
+  // status // Unused in current implementation
 }: BaseFormProps) {
   const { id, loading } = useDecryptedId(encryptedId);
   const router = useRouter();

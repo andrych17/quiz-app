@@ -13,7 +13,7 @@ export default function AdminLayout({
   const pathname = usePathname();
   const [isLoading, setIsLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [user, setUser] = useState({
+  const [user] = useState({
     name: "Demo Administrator",
     email: "admin@example.com",
     role: "superadmin"

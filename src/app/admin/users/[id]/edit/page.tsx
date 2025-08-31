@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BaseEditForm } from "@/components/ui/common/BaseEditForm";
 import { FormField, TextField, Select } from "@/components/ui/common/FormControls";
@@ -38,15 +38,7 @@ function UserEditContent({ userId }: { userId: string }) {
 
   const isCreateMode = userId === 'create';
 
-  useEffect(() => {
-    if (isCreateMode) {
-      setLoading(false);
-    } else {
-      loadUser();
-    }
-  }, [userId, isCreateMode]);
-
-  const loadUser = async () => {
+  const loadUser = useCallback(async () => {
     setLoading(true);
     try {
       const foundUser = db.getUserById(userId);
@@ -63,7 +55,15 @@ function UserEditContent({ userId }: { userId: string }) {
       console.error("Error loading user:", error);
     }
     setLoading(false);
-  };
+  }, [userId]);
+
+  useEffect(() => {
+    if (isCreateMode) {
+      setLoading(false);
+    } else {
+      loadUser();
+    }
+  }, [userId, isCreateMode, loadUser]);
 
   const handleSave = async () => {
     if (!formData.name.trim() || !formData.email.trim()) {
@@ -160,7 +160,7 @@ function UserEditContent({ userId }: { userId: string }) {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
           <h2 className="text-xl font-semibold text-gray-900 mb-4">User Not Found</h2>
-          <p className="text-gray-600">The user you're looking for doesn't exist.</p>
+          <p className="text-gray-600">The user you&apos;re looking for doesn&apos;t exist.</p>
         </div>
       </BaseEditForm>
     );
@@ -292,8 +292,6 @@ function UserEditContent({ userId }: { userId: string }) {
     ? "Add a new user to the system with appropriate permissions"
     : "Update user information and permissions";
 
-  const canSave = formData.name.trim() && formData.email.trim();
-
   return (
     <BaseEditForm
       title={title}
@@ -339,7 +337,24 @@ function UserEditContent({ userId }: { userId: string }) {
   );
 }
 
-export default async function UserEditPage({ params }: PageProps) {
-  const { id } = await params;
-  return <UserEditContent userId={id} />;
+export default function UserEditPage({ params }: PageProps) {
+  const [userId, setUserId] = useState<string>("");
+  
+  useEffect(() => {
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setUserId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
+  
+  if (!userId) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  return <UserEditContent userId={userId} />;
 }

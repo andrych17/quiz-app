@@ -93,7 +93,7 @@ export default function PublicQuizForm({ quiz }: PublicQuizFormProps) {
     });
 
     try {
-      const parsed = publicSubmitSchema.parse({ 
+      publicSubmitSchema.parse({ 
         name: participantInfo.name, 
         nij: participantInfo.nij, 
         answers 
@@ -107,8 +107,9 @@ export default function PublicQuizForm({ quiz }: PublicQuizFormProps) {
       setMessage(result.message);
       setSelectedAnswers({});
       setMultiSelectAnswers({});
-    } catch (err: any) {
-      setError(err.message ?? "Submit failed");
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : "Submit failed";
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
