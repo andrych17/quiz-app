@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
@@ -9,23 +10,59 @@ export default function AdminLoginPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login, isAuthenticated, isLoading: authLoading, error: authError } = useAuth();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Get redirect URL from query params
+  const redirectTo = searchParams.get('redirect') || '/admin/dashboard';
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated && !authLoading) {
+      router.push(redirectTo);
+    }
+  }, [isAuthenticated, authLoading, router, redirectTo]);
+
+  // Update local error when auth error changes
+  useEffect(() => {
+    if (authError) {
+      setError(authError);
+    }
+  }, [authError]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
-    // Dummy authentication - hardcoded credentials
-    setTimeout(() => {
-      if (email && password) {
-        // Just redirect to dashboard for demo purposes
-        router.push("/admin/dashboard");
-      } else {
-        setError("Please fill in both email and password");
-      }
+    // Validation
+    if (!email.trim() || !password.trim()) {
+      setError("Please fill in both email and password");
       setLoading(false);
-    }, 500);
+      return;
+    }
+
+    try {
+      await login(email, password);
+      // Redirect will be handled by useEffect above
+    } catch (err) {
+      // Error will be set by AuthContext
+      console.error('Login failed:', err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Show loading spinner while checking authentication
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
@@ -38,7 +75,7 @@ export default function AdminLoginPage() {
               </svg>
             </div>
             <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-              Quiz Management
+              Sign In
             </h1>
             <p className="mt-2 text-gray-600">Admin Panel - GMS Platform</p>
           </div>
@@ -103,7 +140,7 @@ export default function AdminLoginPage() {
                   <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
                   </svg>
-                  Access Quiz Management
+                  Sign In
                 </span>
               )}
             </button>
@@ -117,7 +154,12 @@ export default function AdminLoginPage() {
               <p className="text-sm text-blue-800 font-semibold">Demo Access</p>
             </div>
             <p className="text-sm text-blue-700">
-              Enter any email and password to access the demo admin panel
+              <strong>Email:</strong> superadmin@gms.com<br />
+              <strong>Password:</strong> password123
+            </p>
+            <p className="text-sm text-blue-700">
+              <strong>Email:</strong> admin@gms.com<br />
+              <strong>Password:</strong> password123
             </p>
           </div>
 

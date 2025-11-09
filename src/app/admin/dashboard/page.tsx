@@ -1,16 +1,93 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
+import { QuizzesAPI, UsersAPI, AdminAPI } from "@/lib/api-client";
 
 export default function AdminDashboard() {
-  const [stats] = useState({
-    totalQuizzes: 5,
-    totalUsers: 3,
-    totalParticipants: 47,
-    completedToday: 8,
-    activeQuizzes: 3,
-    avgScore: 85.6
+  const { 
+    user, 
+    isAuthenticated, 
+    isLoading, 
+    isSuperadmin, 
+    isAdmin,
+    canAccessAllQuizzes,
+    canManageUsers 
+  } = useAuth();
+  const [stats, setStats] = useState({
+    totalQuizzes: 0,
+    totalUsers: 0,
+    totalParticipants: 0,
+    completedToday: 0,
+    activeQuizzes: 0,
+    avgScore: 0
   });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Load dashboard data
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setLoading(true);
+        
+        // Get admin stats (role-based)
+        const promises: Promise<any>[] = [
+          QuizzesAPI.getQuizzes(), // This will be filtered by backend based on user role
+          AdminAPI.getStats().catch(() => null) // Fallback if endpoint doesn't exist
+        ];
+        
+        // Only superadmin can see user management stats
+        if (canManageUsers) {
+          promises.push(UsersAPI.getUsers({ page: 1, limit: 1 })); // Just get count
+        }
+        
+        const results = await Promise.all(promises);
+        const [quizzes, adminStats, users] = results;
+        
+        if (quizzes.success && quizzes.data) {
+          const quizzesData = Array.isArray(quizzes.data) 
+            ? quizzes.data 
+            : (quizzes.data as any)?.items || [];
+            
+          const activeQuizzes = quizzesData.filter((q: any) => q.isPublished).length;
+            
+          setStats(prev => ({
+            ...prev,
+            totalQuizzes: quizzesData.length,
+            activeQuizzes
+          }));
+        }
+        
+        if (users && users.success && users.data) {
+          setStats(prev => ({
+            ...prev,
+            totalUsers: (users.data as any).pagination?.totalItems || (users.data as any).length || 0
+          }));
+        }
+        
+        // If admin stats endpoint exists, use it
+        if (adminStats?.success) {
+          setStats(prev => ({
+            ...prev,
+            totalParticipants: adminStats.data.totalParticipants || 0,
+            completedToday: adminStats.data.completedToday || 0,
+            avgScore: adminStats.data.avgScore || 0
+          }));
+        }
+        
+      } catch (err) {
+        console.error('Failed to load dashboard data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboardData();
+  }, [isAuthenticated]);
 
   const [recentActivity] = useState([
     { id: 1, type: "quiz_completed", user: "Alice Johnson", quiz: "Logic Test - Pelayanan Anak", time: "2 minutes ago", score: 92 },
@@ -20,12 +97,67 @@ export default function AdminDashboard() {
     { id: 5, type: "quiz_completed", user: "David Brown", quiz: "Logic Test - Pelayanan Anak", time: "5 hours ago", score: 88 }
   ]);
 
+  // Show loading state
+  if (isLoading || loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center text-red-600">
+          <p className="text-xl mb-4">⚠️ Error loading dashboard</p>
+          <p className="text-gray-600">{error}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication required state
+  if (!isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <p className="text-xl mb-4">🔒 Authentication Required</p>
+          <p className="text-gray-600">Please log in to access the dashboard</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">📊 Dashboard</h1>
-        <p className="text-gray-600 mt-2">Logic Test GMS Church - Overview</p>
+        <p className="text-gray-600 mt-2">
+          Welcome back, {user?.name || user?.email || 'Admin'}! 
+          {isSuperadmin && " You have full system access."}
+          {isAdmin && " Here are your assigned quizzes."}
+        </p>
+        <div className="mt-2">
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+            isSuperadmin 
+              ? 'bg-purple-100 text-purple-800' 
+              : 'bg-blue-100 text-blue-800'
+          }`}>
+            {user?.role?.toUpperCase()}
+          </span>
+        </div>
       </div>
 
       {/* Key Statistics Grid */}
@@ -37,26 +169,30 @@ export default function AdminDashboard() {
               <span className="text-blue-600 text-2xl">📝</span>
             </div>
             <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Total Quizzes</h3>
+              <h3 className="text-sm font-medium text-gray-600">
+                {canAccessAllQuizzes ? 'All Quizzes' : 'My Assigned Quizzes'}
+              </h3>
               <p className="text-2xl font-bold text-gray-900">{stats.totalQuizzes}</p>
               <p className="text-sm text-green-600">{stats.activeQuizzes} active</p>
             </div>
           </div>
         </div>
 
-        {/* Total Users */}
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-full">
-              <span className="text-purple-600 text-2xl">👥</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Admin Users</h3>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
-              <p className="text-sm text-blue-600">All active</p>
+        {/* Total Users - Only show for superadmin */}
+        {canManageUsers && (
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="flex items-center">
+              <div className="p-3 bg-purple-100 rounded-full">
+                <span className="text-purple-600 text-2xl">👥</span>
+              </div>
+              <div className="ml-4">
+                <h3 className="text-sm font-medium text-gray-600">Admin Users</h3>
+                <p className="text-2xl font-bold text-gray-900">{stats.totalUsers}</p>
+                <p className="text-sm text-blue-600">System wide</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Total Participants */}
         <div className="bg-white rounded-lg shadow-md p-6">
@@ -109,8 +245,19 @@ export default function AdminDashboard() {
             <div className="ml-4">
               <h3 className="text-sm font-medium text-gray-600">Quick Actions</h3>
               <div className="mt-2 space-y-1">
-                <button className="text-sm text-blue-600 hover:underline block">Create Quiz</button>
-                <button className="text-sm text-green-600 hover:underline block">View Reports</button>
+                <a href="/admin/quizzes" className="text-sm text-blue-600 hover:underline block">
+                  {canAccessAllQuizzes ? 'Manage All Quizzes' : 'View My Quizzes'}
+                </a>
+                {canManageUsers && (
+                  <a href="/admin/users" className="text-sm text-green-600 hover:underline block">
+                    Manage Users
+                  </a>
+                )}
+                {isSuperadmin && (
+                  <a href="/admin/assignments" className="text-sm text-purple-600 hover:underline block">
+                    Quiz Assignments
+                  </a>
+                )}
               </div>
             </div>
           </div>

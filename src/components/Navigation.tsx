@@ -2,22 +2,28 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Navigation() {
   const pathname = usePathname();
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { 
+    user, 
+    isAuthenticated, 
+    isSuperadmin, 
+    isAdmin, 
+    canAccessAdminPanel,
+    canManageUsers,
+    canManageAssignments,
+    logout 
+  } = useAuth();
 
-  useEffect(() => {
-    // For demo purposes, we can assume user is not admin by default
-    // or check current path to determine admin status
-    setIsAdmin(pathname.startsWith('/admin') && pathname !== '/admin/login');
-  }, [pathname]);
-
-  const handleLogout = () => {
-    // Simply redirect for demo
-    setIsAdmin(false);
-    window.location.href = "/";
+  const handleLogout = async () => {
+    try {
+      await logout();
+      window.location.href = "/admin/login";
+    } catch (error) {
+      console.error('Logout failed:', error);
+    }
   };
 
   return (
@@ -45,18 +51,8 @@ export default function Navigation() {
               Home
             </Link>
             
-            {isAdmin && (
+            {canAccessAdminPanel && (
               <>
-                <Link 
-                  href="/admin/quizzes" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                    pathname.startsWith("/admin/quizzes") 
-                      ? "bg-blue-100 text-blue-700" 
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  }`}
-                >
-                  My Quizzes
-                </Link>
                 <Link 
                   href="/admin/dashboard" 
                   className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -67,15 +63,69 @@ export default function Navigation() {
                 >
                   Dashboard
                 </Link>
+                <Link 
+                  href="/admin/quizzes" 
+                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    pathname.startsWith("/admin/quizzes") 
+                      ? "bg-blue-100 text-blue-700" 
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                  }`}
+                >
+                  {isSuperadmin ? 'All Quizzes' : 'My Quizzes'}
+                </Link>
+                
+                {canManageUsers && (
+                  <Link 
+                    href="/admin/users" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      pathname.startsWith("/admin/users") 
+                        ? "bg-blue-100 text-blue-700" 
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                  >
+                    Users
+                  </Link>
+                )}
+                
+                {canManageAssignments && (
+                  <Link 
+                    href="/admin/assignments" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      pathname.startsWith("/admin/assignments") 
+                        ? "bg-blue-100 text-blue-700" 
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                  >
+                    Quiz Assignments
+                  </Link>
+                )}
+                
+                {isSuperadmin && (
+                  <Link 
+                    href="/admin/config" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      pathname.startsWith("/admin/config") 
+                        ? "bg-blue-100 text-blue-700" 
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                    }`}
+                  >
+                    Configuration
+                  </Link>
+                )}
               </>
             )}
           </div>
 
-          {/* Auth Actions - Only show for admin users */}
-          {isAdmin && (
-            <div className="flex items-center space-x-4">
+          {/* Auth Actions */}
+          <div className="flex items-center space-x-4">
+            {isAuthenticated ? (
               <div className="flex items-center space-x-3">
-                <span className="text-sm text-gray-600">Admin Panel</span>
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">{user?.name}</span>
+                  <span className="ml-1 text-xs bg-gray-100 px-2 py-1 rounded-full">
+                    {user?.role}
+                  </span>
+                </div>
                 <button
                   onClick={handleLogout}
                   className="px-4 py-2 text-sm bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-colors"
@@ -83,8 +133,15 @@ export default function Navigation() {
                   Logout
                 </button>
               </div>
-            </div>
-          )}
+            ) : (
+              <Link
+                href="/admin/login"
+                className="px-4 py-2 text-sm bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+              >
+                Admin Login
+              </Link>
+            )}
+          </div>
         </div>
 
         {/* Mobile Navigation */}
@@ -99,16 +156,8 @@ export default function Navigation() {
               Home
             </Link>
             
-            {isAdmin && (
+            {canAccessAdminPanel && (
               <>
-                <Link 
-                  href="/admin/quizzes" 
-                  className={`px-3 py-2 rounded-md text-sm font-medium ${
-                    pathname.startsWith("/admin/quizzes") ? "bg-blue-100 text-blue-700" : "text-gray-600"
-                  }`}
-                >
-                  My Quizzes
-                </Link>
                 <Link 
                   href="/admin/dashboard" 
                   className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -117,6 +166,36 @@ export default function Navigation() {
                 >
                   Dashboard
                 </Link>
+                <Link 
+                  href="/admin/quizzes" 
+                  className={`px-3 py-2 rounded-md text-sm font-medium ${
+                    pathname.startsWith("/admin/quizzes") ? "bg-blue-100 text-blue-700" : "text-gray-600"
+                  }`}
+                >
+                  {isSuperadmin ? 'All Quizzes' : 'My Quizzes'}
+                </Link>
+                
+                {canManageUsers && (
+                  <Link 
+                    href="/admin/users" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      pathname.startsWith("/admin/users") ? "bg-blue-100 text-blue-700" : "text-gray-600"
+                    }`}
+                  >
+                    Users
+                  </Link>
+                )}
+                
+                {canManageAssignments && (
+                  <Link 
+                    href="/admin/assignments" 
+                    className={`px-3 py-2 rounded-md text-sm font-medium ${
+                      pathname.startsWith("/admin/assignments") ? "bg-blue-100 text-blue-700" : "text-gray-600"
+                    }`}
+                  >
+                    Quiz Assignments
+                  </Link>
+                )}
               </>
             )}
           </div>

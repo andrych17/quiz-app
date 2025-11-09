@@ -3,29 +3,31 @@
 import { Sidebar } from "@/components/Sidebar";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 
-export default function AdminLayout({
+// Inner layout component that uses auth
+function AdminLayoutInner({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isLoading, setIsLoading] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [user] = useState({
-    name: "Demo Administrator",
-    email: "admin@example.com",
-    role: "superadmin"
-  });
+  const { user, isAuthenticated, isLoading, logout } = useAuth();
 
   // Don't apply layout for sign in pages
   const isSignInPage = pathname === '/admin' || pathname === '/admin/login';
 
+  // Redirect to login if not authenticated
   useEffect(() => {
-    // Just mark as loaded, no auth checks for demo
-    setIsLoading(false);
+    if (!isLoading && !isAuthenticated && !isSignInPage) {
+      router.push('/admin/login');
+    }
+  }, [isLoading, isAuthenticated, isSignInPage, router]);
+
+  useEffect(() => {
     
     // Close profile menu when clicking outside
     const handleClickOutside = (event: MouseEvent) => {
@@ -62,9 +64,15 @@ export default function AdminLayout({
     };
   }, [showProfileMenu, sidebarOpen]);
 
-  const handleLogout = () => {
-    // Simply redirect to admin sign in
-    router.push('/admin');
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/admin/login');
+    } catch (error) {
+      console.error('Logout failed:', error);
+      // Still redirect to login on error
+      router.push('/admin/login');
+    }
   };
 
   const toggleSidebar = () => {
@@ -77,6 +85,15 @@ export default function AdminLayout({
   }
 
   if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  // Show loading if not authenticated and not on sign in page
+  if (!isAuthenticated && !isSignInPage) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -123,12 +140,12 @@ export default function AdminLayout({
               >
                 <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 font-medium text-sm">
-                    {user.name.charAt(0)}
+                    {user?.name.charAt(0) || 'A'}
                   </span>
                 </div>
                 <div className="text-left hidden md:block">
-                  <div className="text-sm font-medium">{user.name}</div>
-                  <div className="text-xs text-gray-500 capitalize">{user.role}</div>
+                  <div className="text-sm font-medium">{user?.name || 'Admin'}</div>
+                  <div className="text-xs text-gray-500 capitalize">{user?.role || 'admin'}</div>
                 </div>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -139,8 +156,8 @@ export default function AdminLayout({
               {showProfileMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border profile-dropdown">
                   <div className="px-4 py-2 border-b">
-                    <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                    <div className="text-sm text-gray-500">{user.email}</div>
+                    <div className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</div>
+                    <div className="text-sm text-gray-500">{user?.email || 'admin@example.com'}</div>
                   </div>
                   
                   <button 
@@ -181,5 +198,20 @@ export default function AdminLayout({
         </main>
       </div>
     </div>
+  );
+}
+
+// Main layout component with AuthProvider
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <AdminLayoutInner>
+        {children}
+      </AdminLayoutInner>
+    </AuthProvider>
   );
 }
