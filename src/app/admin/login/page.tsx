@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function AdminLoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true); // Default remember me = true
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function AdminLoginPage() {
     }
 
     try {
-      await login(email, password);
+      await login(email, password, rememberMe);
       // Redirect will be handled by useEffect above
     } catch (err) {
       // Error will be set by AuthContext
@@ -59,6 +60,18 @@ export default function AdminLoginPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
         <div className="flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // If already authenticated, don't render the login form (redirect will happen in useEffect)
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
+        <div className="flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-3 text-gray-600">Redirecting to dashboard...</span>
         </div>
       </div>
     );
@@ -109,6 +122,19 @@ export default function AdminLoginPage() {
                 placeholder="Enter password"
                 required
               />
+            </div>
+
+            <div className="flex items-center">
+              <input
+                id="remember-me"
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <label htmlFor="remember-me" className="ml-2 block text-sm text-gray-700">
+                Remember me (keep me signed in)
+              </label>
             </div>
 
             {error && (

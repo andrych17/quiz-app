@@ -128,6 +128,22 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/admin/login', request.url));
   }
+
+  // Special handling for /admin/login - redirect to dashboard if already authenticated
+  if (pathname === '/admin/login') {
+    console.log(`Login page access - Token exists: ${!!token}, Token value: ${token ? token.substring(0, 20) + '...' : 'null'}`);
+    if (token) {
+      const isTokenValid = await isValidToken(token);
+      console.log(`Token validation result: ${isTokenValid}`);
+      if (isTokenValid) {
+        console.log('Already authenticated, redirecting from login to dashboard');
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+      }
+    }
+    // If not authenticated, allow access to login page
+    console.log('No valid token, allowing access to login page');
+    return NextResponse.next();
+  }
   
   // If accessing a protected admin route, validate token and check role
   if (isAdminProtected) {

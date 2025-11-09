@@ -1,149 +1,44 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BaseIndexForm } from "@/components/ui/common/BaseIndexForm";
 import DataTable, { Column } from "@/components/ui/common/DataTable";
-import { ConfigItem } from "@/types";
 import { encryptId } from "@/lib/encryption";
-
-// Mock data
-const mockConfigs: ConfigItem[] = [
-  {
-    id: "1",
-    group: "Ministry Types",
-    key: "pelayanan_anak",
-    value: "Pelayanan Anak",
-    description: "Pelayanan untuk anak-anak gereja",
-    createdAt: "2024-01-15T08:00:00Z",
-    updatedAt: "2025-01-30T10:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "2",
-    group: "Ministry Types", 
-    key: "pelayanan_remaja",
-    value: "Pelayanan Remaja",
-    description: "Pelayanan untuk remaja gereja",
-    createdAt: "2024-01-15T08:00:00Z",
-    updatedAt: "2025-01-29T14:30:00Z",
-    createdBy: "admin",
-    updatedBy: "superadmin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "3",
-    group: "Ministry Types",
-    key: "worship_team",
-    value: "Worship Team", 
-    description: "Tim musik dan pujian",
-    createdAt: "2024-01-15T08:00:00Z",
-    updatedAt: "2025-01-28T09:15:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "4",
-    group: "Question Types",
-    key: "multiple_choice",
-    value: "Multiple Choice",
-    description: "Pilihan ganda dengan satu jawaban benar",
-    createdAt: "2024-01-20T08:00:00Z",
-    updatedAt: "2025-01-27T16:20:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "5",
-    group: "Question Types",
-    key: "multiple_select", 
-    value: "Multiple Select",
-    description: "Pilihan ganda dengan beberapa jawaban benar",
-    createdAt: "2024-01-20T08:00:00Z",
-    updatedAt: "2025-01-26T11:45:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: false,
-    status: "inactive"
-  },
-  {
-    id: "6",
-    group: "Locations",
-    key: "surabaya",
-    value: "Surabaya",
-    description: "Kota Surabaya, Jawa Timur",
-    createdAt: "2024-01-10T08:00:00Z",
-    updatedAt: "2025-01-30T12:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "7",
-    group: "Locations",
-    key: "malang",
-    value: "Malang",
-    description: "Kota Malang, Jawa Timur",
-    createdAt: "2024-01-10T08:00:00Z",
-    updatedAt: "2025-01-30T12:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "8",
-    group: "Locations",
-    key: "jakarta",
-    value: "Jakarta",
-    description: "DKI Jakarta",
-    createdAt: "2024-01-10T08:00:00Z",
-    updatedAt: "2025-01-30T12:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "9",
-    group: "Locations",
-    key: "bandung",
-    value: "Bandung",
-    description: "Kota Bandung, Jawa Barat",
-    createdAt: "2024-01-10T08:00:00Z",
-    updatedAt: "2025-01-30T12:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  },
-  {
-    id: "10",
-    group: "Locations",
-    key: "yogyakarta",
-    value: "Yogyakarta",
-    description: "Daerah Istimewa Yogyakarta",
-    createdAt: "2024-01-10T08:00:00Z",
-    updatedAt: "2025-01-30T12:00:00Z",
-    createdBy: "admin",
-    updatedBy: "admin",
-    isActive: true,
-    status: "active"
-  }
-];
+import type { Config as ApiConfig } from "@/types/api";
+import { API } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function ConfigPage() {
-  const [configs, setConfigs] = useState<ConfigItem[]>(mockConfigs);
+  const [configs, setConfigs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { isSuperadmin } = useAuth();
+
+  useEffect(() => {
+    // Only load configs if user is superadmin
+    if (isSuperadmin) {
+      loadConfigs();
+    } else {
+      setLoading(false);
+      setError("You don't have permission to manage system configuration");
+    }
+  }, [isSuperadmin]);
+
+  const loadConfigs = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.config.getConfigs();
+      setConfigs(res.data || []);
+    } catch (err: any) {
+      console.error('Failed to load configs', err);
+      setError(err?.message || 'Failed to load configs');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const columns: Column[] = [
     {
@@ -241,49 +136,65 @@ export default function ConfigPage() {
       label: "Actions",
       render: (_, row) => (
         <div className="flex items-center space-x-3">
-          <button
-            onClick={() => handleEdit(row as unknown as ConfigItem)}
-            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-colors"
-          >
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            Edit
-          </button>
-          <button
-            onClick={() => handleDelete(row as unknown as ConfigItem)}
-            className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
-          >
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete
-          </button>
+          {isSuperadmin ? (
+            <>
+              <button
+                onClick={() => handleEdit(row as unknown as ApiConfig)}
+                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-colors"
+              >
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                Edit
+              </button>
+              <button
+                onClick={() => handleDelete(row as unknown as ApiConfig)}
+                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
+              >
+                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </>
+          ) : (
+            <span className="text-xs text-gray-400 italic">Superadmin only</span>
+          )}
         </div>
       )
     }
   ];
 
   const handleCreate = () => {
-    router.push('/admin/config/new');
+    if (isSuperadmin) {
+      router.push('/admin/config/new');
+    }
   };
 
-  const handleEdit = (config: ConfigItem) => {
-    router.push(`/admin/config/${encryptId(config.id)}`);
+  const handleEdit = (config: ApiConfig) => {
+    router.push(`/admin/config/${encryptId(String(config.id))}`);
   };
 
-  const handleDelete = (config: ConfigItem) => {
+  const handleDelete = (config: ApiConfig) => {
     if (confirm(`Are you sure you want to delete "${config.value}"?`)) {
-      setConfigs(configs.filter(c => c.id !== config.id));
+      (async () => {
+        try {
+          await API.config.deleteConfig(Number(config.id));
+          await loadConfigs();
+        } catch (err: any) {
+          console.error('Delete config failed', err);
+          alert(err?.message || 'Delete failed');
+        }
+      })();
     }
   };
 
   return (
     <BaseIndexForm
       title="System Configuration"
-      subtitle="Kelola konfigurasi sistem dan master data aplikasi"
-      createLabel="Add Configuration"
-      onCreateClick={handleCreate}
+      subtitle={isSuperadmin ? "Kelola konfigurasi sistem dan master data aplikasi" : "View system configuration (read-only access)"}
+      createLabel={isSuperadmin ? "Add Configuration" : undefined}
+      onCreateClick={isSuperadmin ? handleCreate : undefined}
     >
 
       {/* Data Table */}

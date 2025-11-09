@@ -12,16 +12,18 @@ export interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  rememberMe: boolean;
 }
 
 // Auth actions
 type AuthAction =
   | { type: 'SET_LOADING'; payload: boolean }
   | { type: 'SET_ERROR'; payload: string | null }
-  | { type: 'LOGIN_SUCCESS'; payload: { user: User; token: string; refreshToken: string } }
+  | { type: 'LOGIN_SUCCESS'; payload: { user: User; token: string; refreshToken: string; rememberMe?: boolean } }
   | { type: 'LOGOUT' }
   | { type: 'UPDATE_USER'; payload: User }
-  | { type: 'REFRESH_TOKEN'; payload: { token: string; refreshToken: string } };
+  | { type: 'REFRESH_TOKEN'; payload: { token: string; refreshToken: string } }
+  | { type: 'SET_REMEMBER_ME'; payload: boolean };
 
 // Initial state
 const initialState: AuthState = {
@@ -31,6 +33,7 @@ const initialState: AuthState = {
   isAuthenticated: false,
   isLoading: true,
   error: null,
+  rememberMe: true, // Default remember me = true
 };
 
 // Reducer function
@@ -48,6 +51,7 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         user: action.payload.user,
         token: action.payload.token,
         refreshToken: action.payload.refreshToken,
+        rememberMe: action.payload.rememberMe ?? state.rememberMe,
         isAuthenticated: true,
         isLoading: false,
         error: null,
@@ -72,6 +76,12 @@ function authReducer(state: AuthState, action: AuthAction): AuthState {
         refreshToken: action.payload.refreshToken,
       };
     
+    case 'SET_REMEMBER_ME':
+      return {
+        ...state,
+        rememberMe: action.payload,
+      };
+    
     default:
       return state;
   }
@@ -91,12 +101,13 @@ export interface RolePermissions {
 
 // Context interface
 export interface AuthContextType extends AuthState, RolePermissions {
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, rememberMe?: boolean) => Promise<void>;
   logout: () => Promise<void>;
   refreshTokens: () => Promise<void>;
   updateProfile: (user: User) => void;
   hasRole: (roles: string[]) => boolean;
   hasAnyRole: (roles: string[]) => boolean;
+  setRememberMe: (remember: boolean) => void;
 }
 
 // Create context
@@ -106,15 +117,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(authReducer, initialState);
 
-  // Load tokens from localStorage on mount
+  // Load tokens from localStorage or sessionStorage on mount
   useEffect(() => {
     const initializeAuth = async () => {
       try {
         dispatch({ type: 'SET_LOADING', payload: true });
         
         if (typeof window !== 'undefined') {
-          const savedToken = localStorage.getItem('admin_token');
-          const savedRefreshToken = localStorage.getItem('admin_refresh_token');
+          // Try localStorage first (remember me), then sessionStorage
+          let savedToken = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+          let savedRefreshToken = localStorage.getItem('admin_refresh_token') || sessionStorage.getItem('admin_refresh_token');
+          const rememberMe = !!localStorage.getItem('admin_token'); // If token in localStorage, user chose remember me
           
           if (savedToken && savedRefreshToken) {
             // Validate session with backend
@@ -126,12 +139,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                   user: response.data!,
                   token: savedToken,
                   refreshToken: savedRefreshToken,
+                  rememberMe: rememberMe,
                 },
               });
             } catch (error) {
-              // Invalid session, clear storage
+              // Invalid session, clear storage from both locations
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_refresh_token');
+              sessionStorage.removeItem('admin_token');
+              sessionStorage.removeItem('admin_refresh_token');
               dispatch({ type: 'LOGOUT' });
             }
           } else {
@@ -154,26 +170,75 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
-  // Save tokens to localStorage and cookies when they change
+  // Save tokens to appropriate storage based on rememberMe setting
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+      
       if (state.token) {
-        localStorage.setItem('admin_token', state.token);
-        // Also set as cookie for middleware access
-        document.cookie = `admin_token=${state.token}; path=/; max-age=${24 * 60 * 60}`; // 24 hours
+        // Save to appropriate storage based on rememberMe
+        if (state.rememberMe) {
+          localStorage.setItem('admin_token', state.token);
+          sessionStorage.removeItem('admin_token'); // Clear from session storage
+        } else {
+          sessionStorage.setItem('admin_token', state.token);
+          localStorage.removeItem('admin_token'); // Clear from local storage
+        }
+        
+        // Also set as cookie for middleware access - use localhost-friendly settings
+        const cookieValue = `admin_token=${state.token}; path=/; max-age=${state.rememberMe ? 24 * 60 * 60 : 0}`; // Session cookie if not remember me
+        const cookieSettings = isLocalhost 
+          ? `${cookieValue}; samesite=lax`  // For localhost, use lax instead of strict
+          : `${cookieValue}; secure; samesite=strict`; // For production
+        document.cookie = cookieSettings;
+        console.log(`Token saved to ${state.rememberMe ? 'localStorage' : 'sessionStorage'} and cookie:`, state.token.substring(0, 20) + '...');
       } else {
+        // Clear from both storages
         localStorage.removeItem('admin_token');
+        sessionStorage.removeItem('admin_token');
         // Clear cookie
         document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        console.log('Token cleared from all storage');
       }
 
       if (state.refreshToken) {
-        localStorage.setItem('admin_refresh_token', state.refreshToken);
+        // Save refresh token to appropriate storage
+        if (state.rememberMe) {
+          localStorage.setItem('admin_refresh_token', state.refreshToken);
+          sessionStorage.removeItem('admin_refresh_token');
+        } else {
+          sessionStorage.setItem('admin_refresh_token', state.refreshToken);
+          localStorage.removeItem('admin_refresh_token');
+        }
+        
+        const refreshCookieValue = `admin_refresh_token=${state.refreshToken}; path=/; max-age=${state.rememberMe ? 7 * 24 * 60 * 60 : 0}`;
+        const refreshCookieSettings = isLocalhost 
+          ? `${refreshCookieValue}; samesite=lax`
+          : `${refreshCookieValue}; secure; samesite=strict`;
+        document.cookie = refreshCookieSettings;
       } else {
         localStorage.removeItem('admin_refresh_token');
+        sessionStorage.removeItem('admin_refresh_token');
+        document.cookie = 'admin_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       }
     }
-  }, [state.token, state.refreshToken]);
+  }, [state.token, state.refreshToken, state.rememberMe]);
+
+  // Clear storage when logout happens
+  useEffect(() => {
+    if (!state.isAuthenticated && !state.isLoading && typeof window !== 'undefined') {
+      // Clear all tokens from both storage types
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_refresh_token');
+      sessionStorage.removeItem('admin_token');
+      sessionStorage.removeItem('admin_refresh_token');
+      
+      // Clear cookies
+      document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      document.cookie = 'admin_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+      console.log('Logout: All storage cleared');
+    }
+  }, [state.isAuthenticated, state.isLoading]);
 
   // Auto-refresh token when it's about to expire
   useEffect(() => {
@@ -199,12 +264,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, [state.isAuthenticated, state.refreshToken]);
 
-  const login = useCallback(async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string, rememberMe: boolean = true) => {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
       
-      console.log('Attempting login with:', email);
+      console.log('Attempting login with:', email, 'Remember me:', rememberMe);
       const response = await API.auth.login(email, password);
       console.log('Login response (structured):', response);
 
@@ -217,6 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           user: authData.user,
           token: authData.access_token,
           refreshToken: authData.refresh_token || '',
+          rememberMe: rememberMe,
         },
       });
     } catch (error) {
@@ -266,6 +332,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'UPDATE_USER', payload: user });
   }, []);
 
+  const setRememberMe = useCallback((remember: boolean) => {
+    dispatch({ type: 'SET_REMEMBER_ME', payload: remember });
+  }, []);
+
   // Role-based permission helpers
   const hasRole = useCallback((roles: string[]): boolean => {
     return state.user ? roles.includes(state.user.role) : false;
@@ -291,6 +361,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     refreshTokens,
     updateProfile,
+    setRememberMe,
     hasRole,
     hasAnyRole,
     isSuperadmin,

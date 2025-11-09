@@ -4,20 +4,34 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { BaseIndexForm } from "@/components/ui/common/BaseIndexForm";
 import DataTable, { Column } from "@/components/ui/common/DataTable";
-import { db } from "@/lib/mockdb";
-import { Quiz } from "@/types";
+// Use a flexible type for quizzes returned by API to avoid conflicts between local mock types and API types
+import type { Quiz as ApiQuiz } from "@/types/api";
+import { API } from "@/lib/api-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function QuizzesPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
+  const [quizzes, setQuizzes] = useState<ApiQuiz[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { user, isSuperadmin, canAccessAllQuizzes } = useAuth();
 
   useEffect(() => {
     loadQuizzes();
   }, []);
 
-  const loadQuizzes = () => {
-    const dbQuizzes = db.listQuizzes();
-    setQuizzes(dbQuizzes);
+  const loadQuizzes = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.quizzes.getQuizzes();
+      setQuizzes(res.data || []);
+    } catch (err: any) {
+      console.error('Failed to load quizzes', err);
+      setError(err?.message || 'Failed to load quizzes');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const columns: Column[] = [
@@ -110,7 +124,7 @@ export default function QuizzesPage() {
       render: (_, row) => (
         <div className="flex space-x-2">
           <button
-            onClick={() => handleEdit(row as unknown as Quiz)}
+            onClick={() => handleEdit(row as unknown as ApiQuiz)}
             className="inline-flex items-center px-2 py-1 text-xs font-medium text-yellow-700 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
           >
             <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -118,49 +132,66 @@ export default function QuizzesPage() {
             </svg>
             Edit
           </button>
-          <button
-            onClick={() => handleDelete(row as unknown as Quiz)}
-            className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
-          >
-            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-            Delete
-          </button>
+          {(isSuperadmin || canAccessAllQuizzes) && (
+            <button
+              onClick={() => handleDelete(row as unknown as ApiQuiz)}
+              className="inline-flex items-center px-2 py-1 text-xs font-medium text-red-700 bg-red-100 rounded hover:bg-red-200 transition-colors"
+            >
+              <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete
+            </button>
+          )}
         </div>
       )
     }
   ];
 
-  const handleEdit = (quiz: Quiz) => {
+  const handleEdit = (quiz: ApiQuiz) => {
     router.push(`/admin/quizzes/${quiz.id}/edit`);
   };
 
-  const handleDelete = (quiz: Quiz) => {
-    if (confirm(`Are you sure you want to delete &quot;${quiz.title}&quot;?`)) {
-      const success = db.deleteQuiz(quiz.id);
-      if (success) {
-        loadQuizzes();
-      }
+  const handleDelete = (quiz: ApiQuiz) => {
+    if (confirm(`Are you sure you want to delete "${quiz.title}"?`)) {
+      (async () => {
+        try {
+          await API.quizzes.deleteQuiz(Number(quiz.id));
+          await loadQuizzes();
+        } catch (err: any) {
+          console.error('Delete failed', err);
+          alert(err?.message || 'Delete failed');
+        }
+      })();
     }
   };
 
   return (
     <BaseIndexForm
       title="Quiz Management"
-      subtitle="Manage quizzes and assessments with comprehensive question management"
-      createUrl="/admin/quizzes/create/edit"
-      createLabel="Create New Quiz"
+      subtitle={isSuperadmin ? "Manage all quizzes and assessments" : "Manage your assigned quizzes"}
+      createUrl={isSuperadmin ? "/admin/quizzes/create/edit" : undefined}
+      createLabel={isSuperadmin ? "Create New Quiz" : undefined}
     >
-      <DataTable
-        columns={columns}
-        data={quizzes as unknown as Record<string, unknown>[]}
-        searchable={true}
-        sortable={true}
-        pagination={true}
-        pageSize={10}
-        pageSizeOptions={[5, 10, 25, 50]}
-      />
+      {loading && (
+        <div className="p-6 text-center">Loading quizzes...</div>
+      )}
+
+      {error && (
+        <div className="p-6 text-center text-red-600">{error}</div>
+      )}
+
+      {!loading && !error && (
+        <DataTable
+          columns={columns}
+          data={quizzes as unknown as Record<string, unknown>[]}
+          searchable={true}
+          sortable={true}
+          pagination={true}
+          pageSize={10}
+          pageSizeOptions={[5, 10, 25, 50]}
+        />
+      )}
     </BaseIndexForm>
   );
 }

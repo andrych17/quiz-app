@@ -1,11 +1,39 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { adminAuthAPI } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthTestPage() {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [tokenInfo, setTokenInfo] = useState<{
+    contextToken: string | null;
+    localStorageToken: string | null;
+    cookieToken: string | null;
+  }>({
+    contextToken: null,
+    localStorageToken: null,
+    cookieToken: null,
+  });
+  
+  const { isAuthenticated, user, token, isLoading } = useAuth();
+
+  // Check token storage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const lsToken = localStorage.getItem('admin_token');
+      const cookies = document.cookie.split(';');
+      const adminCookie = cookies.find(cookie => cookie.trim().startsWith('admin_token='));
+      const cookieToken = adminCookie ? adminCookie.split('=')[1] : null;
+      
+      setTokenInfo({
+        contextToken: token,
+        localStorageToken: lsToken,
+        cookieToken: cookieToken,
+      });
+    }
+  }, [token, isAuthenticated]);
 
   const testLogin = async () => {
     setLoading(true);
@@ -73,6 +101,20 @@ export default function AuthTestPage() {
             >
               {loading ? 'Loading...' : 'Test Validate Session'}
             </button>
+          </div>
+
+          {/* Auth State Debug */}
+          <div className="bg-blue-100 p-4 rounded mb-4">
+            <h3 className="font-semibold mb-2">Current Auth State:</h3>
+            <div className="text-sm space-y-2">
+              <p><strong>isAuthenticated:</strong> {isAuthenticated ? 'true' : 'false'}</p>
+              <p><strong>isLoading:</strong> {isLoading ? 'true' : 'false'}</p>
+              <p><strong>User:</strong> {user ? user.email : 'null'}</p>
+              <p><strong>Context Token:</strong> {tokenInfo.contextToken ? `${tokenInfo.contextToken.substring(0, 20)}...` : 'null'}</p>
+              <p><strong>localStorage Token:</strong> {tokenInfo.localStorageToken ? `${tokenInfo.localStorageToken.substring(0, 20)}...` : 'null'}</p>
+              <p><strong>Cookie Token:</strong> {tokenInfo.cookieToken ? `${tokenInfo.cookieToken.substring(0, 20)}...` : 'null'}</p>
+              <p><strong>All Cookies:</strong> {typeof window !== 'undefined' ? document.cookie || 'No cookies' : 'N/A'}</p>
+            </div>
           </div>
 
           <div className="bg-gray-100 p-4 rounded">
