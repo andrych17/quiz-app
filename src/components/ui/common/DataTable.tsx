@@ -67,7 +67,9 @@ export default function DataTable({
   };
 
   // Filter data based on search term and column filters
-  const filteredData = data.filter(row => {
+  // Ensure data is an array before filtering
+  const dataArray = Array.isArray(data) ? data : [];
+  const filteredData = dataArray.filter(row => {
     // Global search filter
     const matchesSearch = searchTerm === "" || Object.values(row).some(value =>
       String(value).toLowerCase().includes(searchTerm.toLowerCase())

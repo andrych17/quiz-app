@@ -31,7 +31,13 @@ export default function ConfigPage() {
     setError(null);
     try {
       const res = await API.config.getConfigs();
-      setConfigs(res.data || []);
+      console.log('Config API response:', res);
+      console.log('Config data:', res.data);
+      
+      const configsData = res.data || [];
+      console.log('Final configs data:', configsData, 'Is array:', Array.isArray(configsData));
+      
+      setConfigs(Array.isArray(configsData) ? configsData : []);
     } catch (err: any) {
       console.error('Failed to load configs', err);
       setError(err?.message || 'Failed to load configs');

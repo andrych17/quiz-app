@@ -30,7 +30,14 @@ export default function UsersPage() {
     setError(null);
     try {
       const res = await API.users.getUsers({ page: 1, limit: 100 });
-      setUsers(res.data?.items || []);
+      console.log('Users API response:', res);
+      console.log('Users data:', res.data);
+      console.log('Users items:', res.data?.items);
+      
+      const usersData = res.data?.items || res.data || [];
+      console.log('Final users data:', usersData, 'Is array:', Array.isArray(usersData));
+      
+      setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (err: any) {
       console.error('Failed to load users', err);
       setError(err?.message || 'Failed to load users');
@@ -79,16 +86,35 @@ export default function UsersPage() {
         { value: "true", label: "Active" },
         { value: "false", label: "Inactive" }
       ],
-      render: (value) => (
-        <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-          Boolean(value) ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-        }`}>
-          <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
-            Boolean(value) ? 'bg-green-400' : 'bg-red-400'
-          }`}></span>
-          {Boolean(value) ? 'Active' : 'Inactive'}
-        </span>
-      )
+      render: (value, row) => {
+        // Check multiple possible field names for status
+        const user = row as Record<string, unknown>;
+        const statusValue = user.isActive ?? user.active ?? user.status ?? value;
+        
+        console.log('Status debug:', {
+          value,
+          isActive: user.isActive,
+          active: user.active,
+          status: user.status,
+          finalValue: statusValue,
+          userObject: user
+        });
+        
+        const isActive = statusValue === true || statusValue === 'true' || 
+                        statusValue === 1 || statusValue === '1' || 
+                        statusValue === 'active';
+        
+        return (
+          <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+            isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            <span className={`w-1.5 h-1.5 mr-1 rounded-full ${
+              isActive ? 'bg-green-400' : 'bg-red-400'
+            }`}></span>
+            {isActive ? 'Active' : 'Inactive'}
+          </span>
+        );
+      }
     },
     {
       key: "lastLogin",

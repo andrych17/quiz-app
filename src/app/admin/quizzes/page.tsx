@@ -25,7 +25,13 @@ export default function QuizzesPage() {
     setError(null);
     try {
       const res = await API.quizzes.getQuizzes();
-      setQuizzes(res.data || []);
+      console.log('Quizzes API response:', res);
+      console.log('Quizzes data:', res.data);
+      
+      const quizzesData = res.data || [];
+      console.log('Final quizzes data:', quizzesData, 'Is array:', Array.isArray(quizzesData));
+      
+      setQuizzes(Array.isArray(quizzesData) ? quizzesData : []);
     } catch (err: any) {
       console.error('Failed to load quizzes', err);
       setError(err?.message || 'Failed to load quizzes');

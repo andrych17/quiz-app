@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { QuizzesAPI, UsersAPI, AdminAPI } from "@/lib/api-client";
+import { QuizzesAPI, UsersAPI } from "@/lib/api-client";
 
 export default function AdminDashboard() {
   const { 
@@ -36,7 +36,6 @@ export default function AdminDashboard() {
         // Get admin stats (role-based)
         const promises: Promise<any>[] = [
           QuizzesAPI.getQuizzes(), // This will be filtered by backend based on user role
-          AdminAPI.getStats().catch(() => null) // Fallback if endpoint doesn't exist
         ];
         
         // Only superadmin can see user management stats
@@ -45,7 +44,7 @@ export default function AdminDashboard() {
         }
         
         const results = await Promise.all(promises);
-        const [quizzes, adminStats, users] = results;
+        const [quizzes, users] = results;
         
         if (quizzes.success && quizzes.data) {
           const quizzesData = Array.isArray(quizzes.data) 
@@ -68,15 +67,8 @@ export default function AdminDashboard() {
           }));
         }
         
-        // If admin stats endpoint exists, use it
-        if (adminStats?.success) {
-          setStats(prev => ({
-            ...prev,
-            totalParticipants: adminStats.data.totalParticipants || 0,
-            completedToday: adminStats.data.completedToday || 0,
-            avgScore: adminStats.data.avgScore || 0
-          }));
-        }
+        // Note: Admin stats (participants, daily completions, avg scores) 
+        // will be implemented when backend endpoints are ready
         
       } catch (err) {
         console.error('Failed to load dashboard data:', err);

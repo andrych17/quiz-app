@@ -100,23 +100,28 @@ async function refreshToken(refreshToken: string): Promise<string | null> {
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   
-  console.log(`Middleware processing: ${pathname}`);
-  
-  // Check if the route is admin protected
-  const isAdminProtected = ADMIN_PROTECTED_ROUTES.some(route => 
-    pathname.startsWith(route.path)
-  );
-  
-  // Check if the route is public
-  const isPublicRoute = PUBLIC_ROUTES.some(route => 
-    pathname === route || pathname.startsWith(route)
-  );
+  console.log(`🔥 MIDDLEWARE HIT: ${pathname}`);
   
   // Get authentication token from multiple sources
   const token = getTokenFromRequest(request);
   const refreshTokenValue = getRefreshTokenFromRequest(request);
   
-  console.log(`Route: ${pathname}, Protected: ${isAdminProtected}, Token exists: ${!!token}`);
+  console.log(`Token exists: ${!!token}`);
+  
+  // Special handling for /admin/login - redirect if already authenticated
+  if (pathname === '/admin/login') {
+    if (token) {
+      console.log('User already has token, checking validity...');
+      const isTokenValid = await isValidToken(token);
+      console.log(`Token valid: ${isTokenValid}`);
+      if (isTokenValid) {
+        console.log('Redirecting authenticated user away from login');
+        return NextResponse.redirect(new URL('/admin/dashboard', request.url));
+      }
+    }
+    console.log('Allowing access to login page');
+    return NextResponse.next();
+  }
   
   // Special handling for /admin root - redirect based on authentication
   if (pathname === '/admin') {
@@ -128,6 +133,19 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL('/admin/login', request.url));
   }
+  
+  // Check if the route is admin protected
+  const isAdminProtected = ADMIN_PROTECTED_ROUTES.some(route => 
+    pathname.startsWith(route.path)
+  );
+  
+  // Check if the route is public
+  const isPublicRoute = PUBLIC_ROUTES.some(route => 
+    pathname === route || pathname.startsWith(route)
+  );
+  
+  console.log(`Route: ${pathname}, Protected: ${isAdminProtected}, Public: ${isPublicRoute}`);
+  
 
   // Special handling for /admin/login - redirect to dashboard if already authenticated
   if (pathname === '/admin/login') {
@@ -229,16 +247,22 @@ export async function middleware(request: NextRequest) {
 
 // Helper function to extract token from request
 function getTokenFromRequest(request: NextRequest): string | null {
-  // Try to get from localStorage (client-side) via cookie sync
+  // Try to get from cookie first
   let token = request.cookies.get('admin_token')?.value;
+  console.log(`Cookie admin_token: ${token ? token.substring(0, 20) + '...' : 'null'}`);
   
   // Try to get from Authorization header
   if (!token) {
     const authHeader = request.headers.get('authorization');
     if (authHeader && authHeader.startsWith('Bearer ')) {
       token = authHeader.substring(7);
+      console.log(`Bearer token from header: ${token ? token.substring(0, 20) + '...' : 'null'}`);
     }
   }
+  
+  // Debug: show all cookies
+  const allCookies = Array.from(request.cookies.getAll());
+  console.log('All request cookies:', allCookies.map(c => `${c.name}=${c.value?.substring(0, 20)}...`));
   
   return token || null;
 }
@@ -252,13 +276,8 @@ function getRefreshTokenFromRequest(request: NextRequest): string | null {
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - api (API routes)
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public assets
+     * Match all admin paths specifically
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
+    '/admin/:path*',
   ],
 };

@@ -142,7 +142,7 @@ NODE_ENV=development
 
 # JWT Configuration
 JWT_SECRET=your-super-secret-jwt-key-change-in-production
-JWT_EXPIRES_IN=24h
+JWT_EXPIRES_IN=7d
 JWT_REFRESH_EXPIRES_IN=7d
 
 # URLs (for CORS)
@@ -160,6 +160,76 @@ SESSION_CLEANUP_BATCH_SIZE=100
 
 # Security
 BCRYPT_ROUNDS=10
+```
+
+## 🔐 JWT Security Configuration
+
+### JWT Token Expiration Policy
+
+The application uses JWT (JSON Web Tokens) for authentication with the following security policies:
+
+**Token Lifetimes:**
+- **Access Token**: 7 days (604,800 seconds)
+- **Refresh Token**: 7 days (604,800 seconds)
+
+**Security Features:**
+- ✅ **Automatic Expiration**: Tokens automatically expire after 7 days
+- ✅ **Forced Invalidation**: Expired tokens are rejected by the server
+- ✅ **Secure Storage**: Tokens should be stored securely (localStorage + httpOnly cookies recommended)
+- ✅ **Role-Based Access**: Tokens contain user role information for authorization
+
+**Token Validation:**
+```javascript
+// Token expiration is automatically handled by the JWT library
+// When a token expires, the server returns:
+{
+  "success": false,
+  "message": "Token has expired",
+  "statusCode": 401,
+  "timestamp": "2025-11-10T10:30:00.000Z",
+  "path": "/api/protected-endpoint"
+}
+```
+
+**Frontend Token Management:**
+```javascript
+// Check if token is expired before making requests
+const isTokenExpired = (token) => {
+  if (!token) return true;
+  
+  try {
+    const decoded = jwt.decode(token);
+    const currentTime = Date.now() / 1000;
+    return decoded.exp < currentTime;
+  } catch (error) {
+    return true;
+  }
+};
+
+// Handle expired tokens
+const handleExpiredToken = () => {
+  localStorage.removeItem('access_token');
+  // Redirect to login page
+  window.location.href = '/login';
+};
+```
+
+**Best Practices:**
+1. **Store tokens securely** - Use httpOnly cookies when possible
+2. **Check expiration client-side** - Validate before making API calls
+3. **Handle 401 responses** - Automatically redirect to login on token expiration
+4. **Use refresh tokens** - Implement token refresh flow for better UX
+5. **Clear tokens on logout** - Remove from all storage locations
+
+**Token Payload Structure:**
+```json
+{
+  "sub": 1,           // User ID
+  "email": "user@example.com",
+  "role": "admin",    // User role for authorization
+  "iat": 1731234567,  // Issued at timestamp
+  "exp": 1731839367   // Expiration timestamp (7 days from issue)
+}
 ```
 
 ## API Endpoints

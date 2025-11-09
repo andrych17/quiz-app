@@ -129,7 +129,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let savedRefreshToken = localStorage.getItem('admin_refresh_token') || sessionStorage.getItem('admin_refresh_token');
           const rememberMe = !!localStorage.getItem('admin_token'); // If token in localStorage, user chose remember me
           
-          if (savedToken && savedRefreshToken) {
+          if (savedToken) {
             // Validate session with backend
             try {
               const response = await API.auth.getProfile();
@@ -138,11 +138,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 payload: {
                   user: response.data!,
                   token: savedToken,
-                  refreshToken: savedRefreshToken,
+                  refreshToken: savedRefreshToken || '',
                   rememberMe: rememberMe,
                 },
               });
             } catch (error) {
+              console.log('Token validation failed, clearing storage:', error);
               // Invalid session, clear storage from both locations
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_refresh_token');
@@ -151,6 +152,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               dispatch({ type: 'LOGOUT' });
             }
           } else {
+            console.log('No saved token found, staying logged out');
             dispatch({ type: 'LOGOUT' });
           }
         }
@@ -276,6 +278,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Extract auth data from standardized response
       const authData = response.data!;
       
+      console.log('Token extracted:', authData.access_token.substring(0, 20) + '...');
+      
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
@@ -285,6 +289,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           rememberMe: rememberMe,
         },
       });
+      
+      // Debug: Check cookie immediately after dispatch
+      setTimeout(() => {
+        const cookies = document.cookie.split(';').map(c => c.trim());
+        const adminCookie = cookies.find(c => c.startsWith('admin_token='));
+        console.log('Post-login cookie check:', adminCookie ? 'FOUND: ' + adminCookie.substring(0, 50) + '...' : 'NOT FOUND');
+        console.log('All cookies:', cookies);
+      }, 500);
+      
     } catch (error) {
       console.error('Login error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Login failed';

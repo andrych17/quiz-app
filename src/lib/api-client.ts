@@ -36,9 +36,15 @@ export class BaseApiClient {
     };
 
     // Add authorization header if token exists
-    const token = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+    // Check both localStorage and sessionStorage for token
+    const token = typeof window !== 'undefined' 
+      ? localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token')
+      : null;
     if (token) {
       defaultHeaders['Authorization'] = `Bearer ${token}`;
+      console.log('Adding auth header with token:', token.substring(0, 20) + '...');
+    } else {
+      console.log('No token found in storage');
     }
 
     console.log(`API Request: ${options.method || 'GET'} ${url}`);
@@ -537,10 +543,6 @@ export class UserQuizAssignmentsAPI extends BaseApiClient {
  * Admin Statistics and Reports API client
  */
 export class AdminAPI extends BaseApiClient {
-  static async getStats(): Promise<ApiResponse<any>> {
-    return this.request<any>('/admin/stats');
-  }
-
   static async getSchedulerStatus(): Promise<ApiResponse<any>> {
     return this.request<any>('/schedule/status');
   }
