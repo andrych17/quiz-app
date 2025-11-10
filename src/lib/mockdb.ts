@@ -9,25 +9,25 @@ import { makeToken } from "./token";
 const users: User[] = [
   {
     id: "1",
-    email: "superadmin@gms.com",
-    name: "Super Admin GMS",
+    email: "superadmin@quiz-app.com",
+    name: "Super Administrator", 
     role: "superadmin",
     createdAt: "2024-01-01T00:00:00Z",
     updatedAt: "2025-08-15T10:30:00Z",
     createdBy: "system",
-    updatedBy: "superadmin@gms.com",
+    updatedBy: "superadmin@quiz-app.com",
     lastLogin: "2025-08-31T10:30:00Z",
     isActive: true
   },
   {
     id: "2", 
-    email: "admin@gms.com",
-    name: "Admin GMS",
+    email: "admin2@quiz-app.com",
+    name: "Quiz Admin 2",
     role: "admin",
     createdAt: "2024-02-15T00:00:00Z",
     updatedAt: "2025-07-20T12:15:00Z",
-    createdBy: "superadmin@gms.com",
-    updatedBy: "admin@gms.com",
+    createdBy: "admin@quiz-app.com",
+    updatedBy: "admin2@quiz-app.com",
     lastLogin: "2025-08-30T15:45:00Z",
     isActive: true
   },

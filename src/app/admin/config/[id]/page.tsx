@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { BaseForm } from "@/components/ui/common/BaseForm";
+import { TabFormLayout, TabConfig } from "@/components/ui/enhanced";
+import { BaseEditForm, TextField, TextArea } from "@/components/ui/common";
 import { ConfigItem } from "@/types";
 import { decryptId, encryptId } from "@/lib/encryption";
 
@@ -93,6 +94,30 @@ function ConfigDetailContent({ id }: { id: string }) {
   });
 
   const isCreateMode = id === "new";
+
+  // Tab configuration untuk form edit
+  const tabs: TabConfig[] = [
+    {
+      id: 'general',
+      name: 'General',
+      icon: '⚙️'
+    },
+    {
+      id: 'details',
+      name: 'Details',
+      icon: '📝'
+    },
+    {
+      id: 'settings',
+      name: 'Settings',
+      icon: '🔧'
+    },
+    {
+      id: 'preview',
+      name: 'Preview',
+      icon: '👁️'
+    }
+  ];
 
   const loadConfig = useCallback(() => {
     setLoading(true);
@@ -197,32 +222,38 @@ function ConfigDetailContent({ id }: { id: string }) {
 
   if (!isCreateMode && !config) {
     return (
-      <BaseForm
+      <TabFormLayout
         title="Configuration Not Found"
         subtitle="The requested configuration does not exist"
-        backUrl="/admin/config"
+        tabs={[{ id: 'error', name: 'Error', icon: '❌' }]}
+        showSaveButton={false}
+        showCancelButton={true}
+        onCancel={() => router.push('/admin/config')}
       >
-        <div className="text-center py-12">
-          <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
-          </svg>
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Configuration Not Found</h2>
-          <p className="text-gray-600">The configuration you&apos;re looking for doesn&apos;t exist.</p>
-        </div>
-      </BaseForm>
+        {() => (
+          <div className="text-center py-12">
+            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+            </svg>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Configuration Not Found</h2>
+            <p className="text-gray-600">The configuration you&apos;re looking for doesn&apos;t exist.</p>
+          </div>
+        )}
+      </TabFormLayout>
     );
   }
 
   // Show form for create or edit mode
   if (isCreateMode || isEditMode) {
     return (
-      <BaseForm
+      <BaseEditForm
         title={isCreateMode ? "Add New Configuration" : `Edit ${config?.value}`}
         subtitle={isCreateMode ? "Create a new system configuration" : "Update configuration details"}
         backUrl="/admin/config"
+        backLabel="Back to Configurations"
+        isCreateMode={isCreateMode}
         onSave={handleSave}
         onCancel={handleCancel}
-        isEditing={true}
       >
         <div className="space-y-6">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -324,7 +355,7 @@ function ConfigDetailContent({ id }: { id: string }) {
             </ul>
           </div>
         </div>
-      </BaseForm>
+      </BaseEditForm>
     );
   }
 
@@ -332,16 +363,16 @@ function ConfigDetailContent({ id }: { id: string }) {
   if (!config) return null; // This should never happen as we already checked above
   
   return (
-    <BaseForm
+    <BaseEditForm
       title={config.value}
       subtitle="View configuration details and settings"
       backUrl="/admin/config"
+      backLabel="Back to Configurations"
+      isCreateMode={false}
       onSave={handleEdit}
       onDelete={handleDelete}
       createdAt={config.createdAt}
       updatedAt={config.updatedAt}
-      createdBy={config.createdBy}
-      isActive={config.isActive}
     >
       <div className="space-y-8">
         {/* Configuration Details */}
@@ -483,7 +514,7 @@ function ConfigDetailContent({ id }: { id: string }) {
           </div>
         </div>
       </div>
-    </BaseForm>
+    </BaseEditForm>
   );
 }
 

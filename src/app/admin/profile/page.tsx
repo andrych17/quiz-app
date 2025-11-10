@@ -1,22 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { TextField } from "@/components/ui/common";
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { user: authUser } = useAuth();
   
-  // Demo user data
   const [user, setUser] = useState({
-    name: "Demo Administrator",
-    email: "admin@example.com",
+    name: authUser?.name || "Demo Administrator",
+    email: authUser?.email || "admin@example.com",
     nij: "12345678",
-    role: "superadmin",
+    role: authUser?.role || "admin",
     phone: "+62 812-3456-7890",
     address: "Jakarta, Indonesia",
-    createdAt: "2024-01-15",
-    lastLogin: "2025-08-30T10:00:00Z"
+    createdAt: authUser?.createdAt || "2024-01-15",
+    lastLogin: new Date().toISOString()
   });
+  
+  // Update local state when auth user changes
+  useEffect(() => {
+    if (authUser) {
+      setUser(prev => ({
+        ...prev,
+        name: authUser.name || "Demo Administrator",
+        email: authUser.email || "admin@example.com",
+        role: authUser.role || "admin",
+        createdAt: authUser.createdAt || "2024-01-15"
+      }));
+    }
+  }, [authUser]);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
   const [isEditing, setIsEditing] = useState(false);
@@ -185,12 +200,10 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Full Name
                   </label>
-                  <input
-                    type="text"
+                  <TextField
                     value={editForm.name}
-                    onChange={(e) => setEditForm({...editForm, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
+                    onChange={(value) => setEditForm({...editForm, name: value})}
+                    placeholder="Enter your full name"
                   />
                 </div>
                 
@@ -198,12 +211,11 @@ export default function ProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Email Address
                   </label>
-                  <input
+                  <TextField
                     type="email"
                     value={editForm.email}
-                    onChange={(e) => setEditForm({...editForm, email: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
+                    onChange={(value) => setEditForm({...editForm, email: value})}
+                    placeholder="Enter your email address"
                   />
                 </div>
                 

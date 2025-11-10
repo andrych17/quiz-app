@@ -194,7 +194,7 @@ export default function AdminLoginPage() {
               <p className="text-sm text-blue-800 font-semibold">Demo Access</p>
             </div>
             <p className="text-sm text-blue-700">
-              <strong>Email:</strong> superadmin@gms.com<br />
+              <strong>Email:</strong> admin@quiz-app.com<br />
               <strong>Password:</strong> password123
             </p>
             <p className="text-sm text-blue-700">

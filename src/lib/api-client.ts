@@ -411,6 +411,24 @@ export class QuizSessionsAPI extends BaseApiClient {
     return this.request<QuizSession>(`/quiz-sessions/token/${sessionToken}`);
   }
 
+  static async getSession(sessionToken: string): Promise<ApiResponse<QuizSession>> {
+    return this.getSessionByToken(sessionToken);
+  }
+
+  static async saveAnswers(sessionToken: string, data: { answers: any[] }): Promise<ApiResponse<void>> {
+    return this.request<void>(`/quiz-sessions/${sessionToken}/answers`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async submitSession(sessionToken: string, data: { answers: any[] }): Promise<ApiResponse<{ finalScore?: number; passed?: boolean; completedAt: string }>> {
+    return this.request<{ finalScore?: number; passed?: boolean; completedAt: string }>(`/quiz-sessions/${sessionToken}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   static async getUserSession(userId: number, quizId: number): Promise<ApiResponse<QuizSession>> {
     return this.request<QuizSession>(`/quiz-sessions/user/${userId}/quiz/${quizId}`);
   }
@@ -536,6 +554,40 @@ export class UserQuizAssignmentsAPI extends BaseApiClient {
 
   static async getQuizUsers(quizId: number): Promise<ApiResponse<PaginatedResponse<User>>> {
     return this.request<PaginatedResponse<User>>(`/user-quiz-assignments/quiz/${quizId}/users`);
+  }
+
+  static async getUserAssignments(userId: number): Promise<ApiResponse<any[]>> {
+    return this.request<any[]>(`/user-quiz-assignments/user/${userId}`);
+  }
+}
+
+/**
+ * User Quiz Assignment API client
+ */
+export class UserQuizAssignmentAPI extends BaseApiClient {
+  static async getAllAssignments(): Promise<ApiResponse<any>> {
+    return this.request<any>('/user-quiz-assignments');
+  }
+
+  static async getUserQuizzes(userId: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/user-quiz-assignments/user/${userId}/quizzes`);
+  }
+
+  static async getQuizUsers(quizId: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/user-quiz-assignments/quiz/${quizId}/users`);
+  }
+
+  static async createAssignment(userId: number, quizId: number): Promise<ApiResponse<any>> {
+    return this.request<any>('/user-quiz-assignments', {
+      method: 'POST',
+      body: JSON.stringify({ userId, quizId, isActive: true }),
+    });
+  }
+
+  static async removeAssignment(assignmentId: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/user-quiz-assignments/${assignmentId}`, {
+      method: 'DELETE',
+    });
   }
 }
 

@@ -1,6 +1,8 @@
 // Re-export all common UI components for easy importing
-export { default as DataTable } from './DataTable';
-export type { Column, DataTableProps } from './DataTable';
+export { default as DataTable } from '../table/DataTable';
+export type { Column, DataTableAction } from '../table/DataTable';
+
+export { default as Tabs } from './Tabs';
 
 export { 
   FormField, 

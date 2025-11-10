@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { BaseIndexForm } from "@/components/ui/common/BaseIndexForm";
-import DataTable, { Column } from "@/components/ui/common/DataTable";
+import DataTable, { Column, DataTableAction } from "@/components/ui/table/DataTable";
+import type { FilterOption, TableFilters } from "@/components/ui/table/TableFilterBar";
 import { encryptId } from "@/lib/encryption";
 import type { Config as ApiConfig } from "@/types/api";
 import { API } from "@/lib/api-client";
@@ -13,18 +13,22 @@ export default function ConfigPage() {
   const [configs, setConfigs] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+  const [total, setTotal] = useState(0);
+  const [filterValues, setFilterValues] = useState<TableFilters>({});
   const router = useRouter();
-  const { isSuperadmin } = useAuth();
+  const { isAdmin } = useAuth();
 
   useEffect(() => {
-    // Only load configs if user is superadmin
-    if (isSuperadmin) {
+    // Only load configs if user is admin
+    if (isAdmin) {
       loadConfigs();
     } else {
       setLoading(false);
       setError("You don't have permission to manage system configuration");
     }
-  }, [isSuperadmin]);
+  }, [isAdmin, page, limit, filterValues]);
 
   const loadConfigs = async () => {
     setLoading(true);
@@ -32,12 +36,37 @@ export default function ConfigPage() {
     try {
       const res = await API.config.getConfigs();
       console.log('Config API response:', res);
-      console.log('Config data:', res.data);
       
-      const configsData = res.data || [];
-      console.log('Final configs data:', configsData, 'Is array:', Array.isArray(configsData));
+      // Handle response with filtering and pagination
+      const response = res.data as any;
+      const configsData = response?.items || response?.data || res.data || [];
+      let filteredConfigs = Array.isArray(configsData) ? configsData : [];
       
-      setConfigs(Array.isArray(configsData) ? configsData : []);
+      // Apply client-side filtering for now
+      if (filterValues.key && typeof filterValues.key === 'string') {
+        filteredConfigs = filteredConfigs.filter(config => 
+          config.key?.toLowerCase().includes(filterValues.key.toLowerCase())
+        );
+      }
+      
+      if (filterValues.group && typeof filterValues.group === 'string') {
+        filteredConfigs = filteredConfigs.filter(config => 
+          config.group?.toLowerCase().includes(filterValues.group.toLowerCase())
+        );
+      }
+      
+      if (filterValues.category) {
+        filteredConfigs = filteredConfigs.filter(config => 
+          config.category === filterValues.category
+        );
+      }
+      
+      // Apply pagination
+      const startIndex = (page - 1) * limit;
+      const paginatedConfigs = filteredConfigs.slice(startIndex, startIndex + limit);
+      
+      setConfigs(paginatedConfigs);
+      setTotal(filteredConfigs.length);
     } catch (err: any) {
       console.error('Failed to load configs', err);
       setError(err?.message || 'Failed to load configs');
@@ -46,17 +75,11 @@ export default function ConfigPage() {
     }
   };
 
+  // Kolom tabel dengan render yang lebih bersih
   const columns: Column[] = [
     {
       key: "group",
       label: "Group",
-      filterable: true,
-      filterType: "select",
-      filterOptions: [
-        { value: "Ministry Types", label: "Ministry Types" },
-        { value: "Question Types", label: "Question Types" },
-        { value: "Locations", label: "Locations" }
-      ],
       render: (value) => (
         <span className="inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-800 border border-blue-200">
           <svg className="w-3 h-3 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +92,6 @@ export default function ConfigPage() {
     {
       key: "key", 
       label: "Key",
-      filterable: true,
       render: (value) => (
         <code className="text-sm font-mono bg-gradient-to-r from-gray-50 to-gray-100 px-3 py-2 rounded-lg border border-gray-200 text-gray-800">
           {String(value)}
@@ -93,12 +115,6 @@ export default function ConfigPage() {
     {
       key: "isActive",
       label: "Status",
-      filterable: true,
-      filterType: "select",
-      filterOptions: [
-        { value: "true", label: "Active" },
-        { value: "false", label: "Inactive" }
-      ],
       render: (value) => (
         <span className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg ${
           Boolean(value) 
@@ -136,43 +152,35 @@ export default function ConfigPage() {
           </div>
         );
       }
-    },
-    {
-      key: "actions",
-      label: "Actions",
-      render: (_, row) => (
-        <div className="flex items-center space-x-3">
-          {isSuperadmin ? (
-            <>
-              <button
-                onClick={() => handleEdit(row as unknown as ApiConfig)}
-                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-lg hover:bg-amber-100 hover:border-amber-300 transition-colors"
-              >
-                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(row as unknown as ApiConfig)}
-                className="inline-flex items-center px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 hover:border-red-300 transition-colors"
-              >
-                <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-                Delete
-              </button>
-            </>
-          ) : (
-            <span className="text-xs text-gray-400 italic">Superadmin only</span>
-          )}
-        </div>
-      )
     }
   ];
 
+  // Actions untuk tabel
+  const actions: DataTableAction[] = isAdmin ? [
+    {
+      label: 'Edit',
+      onClick: (row) => handleEdit(row as ApiConfig),
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+      variant: 'primary'
+    },
+    {
+      label: 'Delete',
+      onClick: (row) => handleDelete(row as ApiConfig),
+      icon: (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+        </svg>
+      ),
+      variant: 'danger'
+    }
+  ] : [];
+
   const handleCreate = () => {
-    if (isSuperadmin) {
+    if (isAdmin) {
       router.push('/admin/config/new');
     }
   };
@@ -195,31 +203,155 @@ export default function ConfigPage() {
     }
   };
 
-  return (
-    <BaseIndexForm
-      title="System Configuration"
-      subtitle={isSuperadmin ? "Kelola konfigurasi sistem dan master data aplikasi" : "View system configuration (read-only access)"}
-      createLabel={isSuperadmin ? "Add Configuration" : undefined}
-      onCreateClick={isSuperadmin ? handleCreate : undefined}
-    >
+  // Filter options untuk tabel
+  const filters: FilterOption[] = [
+    {
+      key: 'key',
+      label: 'Key',
+      type: 'text',
+      placeholder: 'Search by key...'
+    },
+    {
+      key: 'group',
+      label: 'Group',
+      type: 'text',
+      placeholder: 'Search by group...'
+    },
+    {
+      key: 'category',
+      label: 'Category',
+      type: 'select',
+      placeholder: 'Choose Category',
+      options: [
+        { value: 'system', label: 'System' },
+        { value: 'quiz', label: 'Quiz' },
+        { value: 'security', label: 'Security' },
+        { value: 'email', label: 'Email' }
+      ]
+    }
+  ];
 
-      {/* Data Table */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Configuration Items</h3>
-          <p className="text-sm text-gray-600 mt-1">Manage system configurations and master data</p>
-        </div>
-        <div className="p-6">
-          <DataTable
-            columns={columns}
-            data={configs as unknown as Record<string, unknown>[]}
-            searchable={true}
-            sortable={true}
-            pagination={true}
-            pageSize={10}
-          />
+  const handleFilterChange = (filters: TableFilters) => {
+    setFilterValues(filters);
+    setPage(1); // Reset to first page when filtering
+  };
+
+  const handleSort = (column: string, direction: 'asc' | 'desc') => {
+    // Implement sorting logic here
+    console.log('Sort:', column, direction);
+  };
+
+  const filterOptions = [
+    { label: "All Categories", value: "all" },
+    { label: "Application", value: "application" },
+    { label: "Database", value: "database" },
+    { label: "Email", value: "email" },
+    { label: "Security", value: "security" }
+  ];
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+            <svg className="w-12 h-12 text-red-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.864-.833-2.634 0L4.232 15.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+            <h3 className="text-lg font-medium text-red-900">Access Denied</h3>
+            <p className="text-red-700 mt-2">You don't have permission to manage system configuration.</p>
+          </div>
         </div>
       </div>
-    </BaseIndexForm>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading configurations...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center text-red-600">
+          <p className="text-xl mb-4">⚠️ {error}</p>
+          <button
+            onClick={() => loadConfigs()}
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Try Again
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">System Configuration</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Manage system configuration and master data
+          </p>
+        </div>
+        
+        <div className="flex space-x-3">
+          <button
+            onClick={handleCreate}
+            className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            Add Configuration
+          </button>
+        </div>
+      </div>
+
+      {/* Data Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <DataTable
+          columns={columns}
+          data={configs}
+          actions={actions}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          onSort={handleSort}
+          loading={loading}
+          emptyMessage="No configurations found"
+          emptyIcon={
+            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          }
+          pagination={{
+            page,
+            limit,
+            total,
+            onPageChange: setPage,
+            onLimitChange: (newLimit) => {
+              setLimit(newLimit);
+              setPage(1);
+            }
+          }}
+          showExport
+          onExport={() => console.log('Export configurations')}
+        />
+      </div>
+
+      {/* Footer Info */}
+      <div className="text-sm text-gray-500 text-center">
+        Showing {configs.length} of {total} configurations
+      </div>
+    </div>
   );
 }

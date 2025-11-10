@@ -2,6 +2,16 @@
 
 import { ReactNode } from "react";
 import { BaseForm } from "./BaseForm";
+import Tabs from "./Tabs";
+
+interface Tab {
+  id: string;
+  label: string;
+  icon?: ReactNode;
+  content: ReactNode;
+  disabled?: boolean;
+  badge?: string | number;
+}
 
 interface BaseEditFormProps {
   title: string;
@@ -15,7 +25,11 @@ interface BaseEditFormProps {
   onDelete?: () => void | Promise<void>;
   onCancel?: () => void;
   isSaving?: boolean;
-  children: ReactNode;
+  children?: ReactNode;
+  // Tab support
+  tabs?: Tab[];
+  defaultTab?: string;
+  onTabChange?: (tabId: string) => void;
   // Metadata props (only for edit mode)
   createdAt?: string;
   updatedAt?: string;
@@ -37,6 +51,9 @@ export function BaseEditForm({
   onCancel,
   isSaving = false,
   children,
+  tabs,
+  defaultTab,
+  onTabChange,
   createdAt,
   updatedAt,
   createdBy,
@@ -69,7 +86,15 @@ export function BaseEditForm({
       updatedBy={updatedBy}
       isActive={isActive}
     >
-      {children}
+      {tabs && tabs.length > 0 ? (
+        <Tabs 
+          tabs={tabs} 
+          defaultTab={defaultTab} 
+          onChange={onTabChange}
+        />
+      ) : (
+        children
+      )}
     </BaseForm>
   );
 }

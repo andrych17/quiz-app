@@ -358,14 +358,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return state.user ? roles.some(role => state.user!.role === role) : false;
   }, [state.user]);
 
-  // Computed role permissions
+  // Computed role permissions with clear hierarchy
   const isSuperadmin = state.user?.role === 'superadmin';
   const isAdmin = state.user?.role === 'admin';
   const isUser = state.user?.role === 'user';
+  
+  // Superadmin has access to everything
+  // Admin has limited access based on assignments
   const canAccessAllQuizzes = isSuperadmin;
   const canManageAssignments = isSuperadmin;
   const canCreateQuizzes = isSuperadmin || isAdmin;
   const canManageUsers = isSuperadmin;
+  const canManageConfig = isSuperadmin;
   const canAccessAdminPanel = isSuperadmin || isAdmin;
 
   const contextValue: AuthContextType = {
@@ -384,6 +388,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     canManageAssignments,
     canCreateQuizzes,
     canManageUsers,
+    canManageConfig,
     canAccessAdminPanel,
   };
 

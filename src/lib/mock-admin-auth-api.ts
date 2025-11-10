@@ -5,19 +5,19 @@ export class MockAdminAuthAPI {
   private static mockUsers: Array<User & { password: string }> = [
     {
       id: "1",
-      email: "admin@gms.com",
-      name: "Demo Administrator",
-      role: "admin",
+      email: "superadmin@quiz-app.com",
+      name: "Super Administrator",
+      role: "superadmin",
       password: "admin123",
       createdAt: "2024-01-01T00:00:00Z",
       isActive: true,
     },
     {
       id: "2",
-      email: "superadmin@gms.com", 
-      name: "Super Admin",
-      role: "superadmin",
-      password: "super123",
+      email: "admin2@quiz-app.com", 
+      name: "Quiz Admin 2",
+      role: "admin",
+      password: "admin123",
       createdAt: "2024-01-01T00:00:00Z",
       isActive: true,
     }
