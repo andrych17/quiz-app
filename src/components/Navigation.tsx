@@ -11,9 +11,9 @@ export default function Navigation() {
     isAuthenticated, 
     isSuperadmin, 
     isAdmin, 
+    isLoading,
     canAccessAdminPanel,
     canManageUsers,
-    canManageAssignments,
     logout 
   } = useAuth();
 
@@ -51,7 +51,7 @@ export default function Navigation() {
               Home
             </Link>
             
-            {canAccessAdminPanel && (
+            {!isLoading && canAccessAdminPanel && (
               <>
                 <Link 
                   href="/admin/dashboard" 
@@ -74,7 +74,7 @@ export default function Navigation() {
                   {isSuperadmin ? 'All Quizzes' : 'My Quizzes'}
                 </Link>
                 
-                {canManageUsers && (
+                {!isLoading && canManageUsers && (
                   <Link 
                     href="/admin/users" 
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -87,20 +87,7 @@ export default function Navigation() {
                   </Link>
                 )}
                 
-                {canManageAssignments && (
-                  <Link 
-                    href="/admin/assignments" 
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      pathname.startsWith("/admin/assignments") 
-                        ? "bg-blue-100 text-blue-700" 
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    }`}
-                  >
-                    Quiz Assignments
-                  </Link>
-                )}
-                
-                {isSuperadmin && (
+                {!isLoading && isSuperadmin && (
                   <Link 
                     href="/admin/config" 
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -156,7 +143,7 @@ export default function Navigation() {
               Home
             </Link>
             
-            {canAccessAdminPanel && (
+            {!isLoading && canAccessAdminPanel && (
               <>
                 <Link 
                   href="/admin/dashboard" 
@@ -175,7 +162,7 @@ export default function Navigation() {
                   {isSuperadmin ? 'All Quizzes' : 'My Quizzes'}
                 </Link>
                 
-                {canManageUsers && (
+                {!isLoading && canManageUsers && (
                   <Link 
                     href="/admin/users" 
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
@@ -186,14 +173,14 @@ export default function Navigation() {
                   </Link>
                 )}
                 
-                {canManageAssignments && (
+                {!isLoading && isSuperadmin && (
                   <Link 
-                    href="/admin/assignments" 
+                    href="/admin/config" 
                     className={`px-3 py-2 rounded-md text-sm font-medium ${
-                      pathname.startsWith("/admin/assignments") ? "bg-blue-100 text-blue-700" : "text-gray-600"
+                      pathname.startsWith("/admin/config") ? "bg-blue-100 text-blue-700" : "text-gray-600"
                     }`}
                   >
-                    Quiz Assignments
+                    Configuration
                   </Link>
                 )}
               </>

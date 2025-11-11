@@ -23,12 +23,17 @@ export default function UserDetailPage({ params }: PageProps) {
   const router = useRouter();
   const { isSuperadmin } = useAuth();
 
+  const isCreateMode = userId === "new";
+
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    role: 'admin' as 'admin' | 'user' | 'superadmin'
+    confirmPassword: '',
+    role: 'admin' as 'admin' | 'user' | 'superadmin',
+    location: '',
+    service: ''
   });
 
   const [selectedQuizzes, setSelectedQuizzes] = useState<number[]>([]);
@@ -42,7 +47,7 @@ export default function UserDetailPage({ params }: PageProps) {
     getParams();
   }, [params]);
 
-  const isCreateMode = userId === 'create';
+
 
   useEffect(() => {
     if (!userId) return;
@@ -78,7 +83,10 @@ export default function UserDetailPage({ params }: PageProps) {
           name: userData.name || '',
           email: userData.email || '',
           password: '',
-          role: userData.role || 'admin'
+          confirmPassword: '',
+          role: userData.role || 'admin',
+          location: typeof userData.location === 'object' ? userData.location.key : userData.location || '',
+          service: typeof userData.service === 'object' ? userData.service.key : userData.service || ''
         });
       }
 

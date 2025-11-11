@@ -141,12 +141,13 @@ const users: User[] = [
 
 // Mock config data
 const configs: ConfigItem[] = [
+  // Locations
   {
     id: "1",
-    group: "Ministry Types",
-    key: "pelayanan_anak",
-    value: "Pelayanan Anak",
-    description: "Pelayanan untuk anak-anak gereja",
+    group: "location",
+    key: "jakarta",
+    value: "Jakarta",
+    description: "Jakarta office location",
     order: 1,
     isActive: true,
     createdAt: "2024-01-01T00:00:00Z",
@@ -155,10 +156,10 @@ const configs: ConfigItem[] = [
   },
   {
     id: "2",
-    group: "Ministry Types",
-    key: "pelayanan_remaja", 
-    value: "Pelayanan Remaja",
-    description: "Pelayanan untuk remaja gereja",
+    group: "location", 
+    key: "bandung",
+    value: "Bandung",
+    description: "Bandung office location",
     order: 2,
     isActive: true,
     createdAt: "2024-01-01T00:00:00Z",
@@ -167,7 +168,105 @@ const configs: ConfigItem[] = [
   },
   {
     id: "3",
-    group: "Question Types",
+    group: "location",
+    key: "surabaya",
+    value: "Surabaya", 
+    description: "Surabaya office location",
+    order: 3,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "4",
+    group: "location",
+    key: "yogyakarta",
+    value: "Yogyakarta",
+    description: "Yogyakarta office location", 
+    order: 4,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "5",
+    group: "location",
+    key: "medan",
+    value: "Medan",
+    description: "Medan office location",
+    order: 5,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  // Services
+  {
+    id: "6",
+    group: "service",
+    key: "gms",
+    value: "GMS",
+    description: "General Management System",
+    order: 1,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "7",
+    group: "service",
+    key: "automotive",
+    value: "Automotive",
+    description: "Automotive service division",
+    order: 2,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "8",
+    group: "service",
+    key: "finance",
+    value: "Finance",
+    description: "Finance service division",
+    order: 3,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "9",
+    group: "service",
+    key: "retail",
+    value: "Retail",
+    description: "Retail service division",
+    order: 4,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  {
+    id: "10",
+    group: "service",
+    key: "healthcare",
+    value: "Healthcare", 
+    description: "Healthcare service division",
+    order: 5,
+    isActive: true,
+    createdAt: "2024-01-01T00:00:00Z",
+    updatedAt: "2024-01-01T00:00:00Z",
+    createdBy: "system"
+  },
+  // Other configs
+  {
+    id: "11",
+    group: "question_types",
     key: "multiple_choice",
     value: "Multiple Choice",
     description: "Pilihan ganda dengan satu jawaban benar",

@@ -1,25 +1,87 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { BasePageLayout, DataTable, Column, DataTableAction, FilterOption, TableFilters } from "@/components/ui/enhanced";
+import { BasePageLayout, DataTable, Column, DataTableAction, FilterOption, TableFilters, SortConfig } from "@/components/ui/enhanced";
 import { encryptId } from "@/lib/encryption";
 import { API } from "@/lib/api-client";
 import type { User as ApiUser } from "@/types/api";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function UsersPage() {
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<ApiUser[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [, setError] = useState<string | null>(null);
   const [filterValues, setFilterValues] = useState<TableFilters>({});
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'createdAt', direction: 'DESC' });
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
+  const [locationOptions, setLocationOptions] = useState<Array<{value: string, label: string}>>([]);
+  const [serviceOptions, setServiceOptions] = useState<Array<{value: string, label: string}>>([]);
   const router = useRouter();
-  const { user, isAdmin, canManageUsers } = useAuth();
+  const { canManageUsers } = useAuth();
+
+  // Memoize filter values to prevent unnecessary re-renders
+  const memoizedFilterValues = useMemo(() => filterValues, [filterValues]);
+
+  const loadUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await API.users.getUsers({ 
+        page, 
+        limit,
+        ...memoizedFilterValues // Apply filters
+      });
+      console.log('Users API response:', res);
+      
+      // Handle paginated response
+      const response = res.data as { items?: ApiUser[], data?: ApiUser[], total?: number, count?: number };
+      const usersData = response?.items || response?.data || (Array.isArray(res.data) ? res.data : []);
+      const totalCount = response?.total || response?.count || (Array.isArray(usersData) ? usersData.length : 0);
+      
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      setTotal(totalCount);
+    } catch (err: unknown) {
+      console.error('Failed to load users', err);
+      setError(err instanceof Error ? err.message : 'Failed to load users');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, limit, memoizedFilterValues]);
+
+  const loadConfigOptions = useCallback(async () => {
+    try {
+      // Load location options from backend API
+      const locationRes = await API.config.getConfigsByGroup('location');
+      const locationData = locationRes?.data || [];
+      const locationOpts = Array.isArray(locationData) ? locationData.map((config: { key: string, value: string }) => ({
+        value: config.key,
+        label: config.value
+      })) : [];
+      setLocationOptions(locationOpts);
+
+      // Load service options from backend API
+      const serviceRes = await API.config.getConfigsByGroup('service');
+      const serviceData = serviceRes?.data || [];
+      const serviceOpts = Array.isArray(serviceData) ? serviceData.map((config: { key: string, value: string }) => ({
+        value: config.key,
+        label: config.value
+      })) : [];
+      setServiceOptions(serviceOpts);
+    } catch (err) {
+      console.error('Failed to load config options:', err);
+      // If API fails or no data, set empty arrays
+      setLocationOptions([]);
+      setServiceOptions([]);
+    }
+  }, []);
 
   useEffect(() => {
+    // Load config options first
+    loadConfigOptions();
+    
     // Only load users if user can manage them
     if (canManageUsers) {
       loadUsers();
@@ -27,36 +89,10 @@ export default function UsersPage() {
       setLoading(false);
       setError("You don't have permission to manage users");
     }
-  }, [canManageUsers, page, limit, filterValues]);
+  }, [canManageUsers, loadUsers, loadConfigOptions]);
 
-  const loadUsers = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await API.users.getUsers({ 
-        page, 
-        limit,
-        ...filterValues // Apply filters
-      });
-      console.log('Users API response:', res);
-      
-      // Handle paginated response
-      const response = res.data as any;
-      const usersData = response?.items || response?.data || res.data || [];
-      const totalCount = response?.total || response?.count || usersData.length;
-      
-      setUsers(Array.isArray(usersData) ? usersData : []);
-      setTotal(totalCount);
-    } catch (err: any) {
-      console.error('Failed to load users', err);
-      setError(err?.message || 'Failed to load users');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Filter options untuk tabel
-  const filters: FilterOption[] = [
+  // Filter options untuk tabel - using dynamic config data
+  const filters: FilterOption[] = useMemo(() => [
     {
       key: 'name',
       label: 'Name',
@@ -75,9 +111,24 @@ export default function UsersPage() {
       type: 'select',
       placeholder: 'Choose Role',
       options: [
+        { value: 'superadmin', label: 'Super Admin' },
         { value: 'admin', label: 'Admin' },
         { value: 'user', label: 'User' }
       ]
+    },
+    {
+      key: 'locationId',
+      label: 'Location',
+      type: 'select',
+      placeholder: 'Choose Location',
+      options: locationOptions
+    },
+    {
+      key: 'serviceId',
+      label: 'Service',
+      type: 'select',
+      placeholder: 'Choose Service',
+      options: serviceOptions
     },
     {
       key: 'isActive',
@@ -89,14 +140,14 @@ export default function UsersPage() {
         { value: 'false', label: 'Inactive' }
       ]
     }
-  ];
+  ], [locationOptions, serviceOptions]);
 
   // Kolom tabel dengan render yang sama seperti config
   const columns: Column[] = [
     {
       key: "name",
       label: "Name",
-      render: (value, row) => (
+      render: (value: unknown, row: ApiUser) => (
         <div>
           <div className="font-medium text-gray-900">{String(value)}</div>
           <div className="text-sm text-gray-500">{String(row.email)}</div>
@@ -106,7 +157,7 @@ export default function UsersPage() {
     {
       key: "role",
       label: "Role",
-      render: (value) => (
+      render: (value: unknown) => (
         <span className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg ${
           String(value) === 'superadmin' 
             ? 'bg-gradient-to-r from-purple-50 to-purple-100 text-purple-800 border border-purple-200' 
@@ -122,9 +173,46 @@ export default function UsersPage() {
       )
     },
     {
+      key: "service",
+      label: "Service",
+      render: (value: unknown, row: ApiUser) => {
+        // Try to get service name from the service object first, then from serviceId, then from serviceOptions
+        const serviceName = row.service?.value || 
+                           serviceOptions.find(opt => opt.value === String(row.serviceId))?.label || 
+                           'Not Assigned';
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-800">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+            </svg>
+            {serviceName}
+          </span>
+        );
+      }
+    },
+    {
+      key: "location",
+      label: "Location",
+      render: (value: unknown, row: ApiUser) => {
+        // Try to get location name from the location object first, then from locationId, then from locationOptions
+        const locationName = row.location?.value || 
+                            locationOptions.find(opt => opt.value === String(row.location?.key))?.label || 
+                            'Not Assigned';
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-50 text-green-800">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            {locationName}
+          </span>
+        );
+      }
+    },
+    {
       key: "isActive",
       label: "Status",
-      render: (value, row) => {
+      render: (value: unknown) => {
         const isActive = value === true || value === 'true' || value === 1 || value === '1';
         return (
           <span className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-lg ${
@@ -193,12 +281,12 @@ export default function UsersPage() {
 
   const handleCreate = () => {
     if (canManageUsers) {
-      router.push('/admin/users/create');
+      router.push('/admin/users/new');
     }
   };
 
   const handleEdit = (user: ApiUser) => {
-    router.push(`/admin/users/${encryptId(String(user.id))}`);
+    router.push(`/admin/users/${user.id}`);
   };
 
   const handleDelete = (user: ApiUser) => {
@@ -207,23 +295,28 @@ export default function UsersPage() {
         try {
           await API.users.deleteUser(Number(user.id));
           await loadUsers();
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Delete user failed', err);
-          alert(err?.message || 'Delete failed');
+          alert(err instanceof Error ? err.message : 'Delete failed');
         }
       })();
     }
   };
 
-  const handleFilterChange = (filters: TableFilters) => {
+  const handleFilterChange = useCallback((filters: TableFilters) => {
     setFilterValues(filters);
     setPage(1); // Reset to first page when filtering
-  };
+  }, []);
 
-  const handleSort = (column: string, direction: 'asc' | 'desc') => {
-    // Implement sorting logic here
-    console.log('Sort:', column, direction);
-  };
+  const handleSort = useCallback((field: string, direction: 'ASC' | 'DESC') => {
+    setSortConfig({ field, direction });
+    console.log('Sort:', field, direction);
+  }, []);
+
+  const handleLimitChange = useCallback((newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1); // Reset to first page when changing limit
+  }, []);
 
   if (!canManageUsers) {
     return (
@@ -237,7 +330,7 @@ export default function UsersPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.864-.833-2.634 0L4.232 15.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
           <h3 className="text-lg font-medium text-red-900">Access Denied</h3>
-          <p className="text-red-700 mt-2">You don't have permission to manage users.</p>
+          <p className="text-red-700 mt-2">You don&apos;t have permission to manage users.</p>
         </div>
       </BasePageLayout>
     );
@@ -265,6 +358,8 @@ export default function UsersPage() {
         columns={columns}
         actions={actions}
         filters={filters}
+        filterValues={filterValues}
+        sortConfig={sortConfig}
         onFilterChange={handleFilterChange}
         onSort={handleSort}
         loading={loading}
@@ -279,10 +374,7 @@ export default function UsersPage() {
           limit,
           total,
           onPageChange: setPage,
-          onLimitChange: (newLimit) => {
-            setLimit(newLimit);
-            setPage(1); // Reset to first page when changing limit
-          }
+          onLimitChange: handleLimitChange
         }}
         showExport
         onExport={() => console.log('Export data')}

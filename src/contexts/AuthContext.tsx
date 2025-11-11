@@ -96,6 +96,7 @@ export interface RolePermissions {
   canManageAssignments: boolean;
   canCreateQuizzes: boolean;
   canManageUsers: boolean;
+  canManageConfig: boolean;
   canAccessAdminPanel: boolean;
 }
 

@@ -8,6 +8,6 @@ export { default as TableFilterBar } from '../table/TableFilterBar';
 export { default as DataTable } from '../table/DataTable';
 
 // Types
-export type { FilterOption, TableFilters } from '../table/TableFilterBar';
+export type { FilterOption, TableFilters, SortConfig, PaginationConfig } from '../table/TableFilterBar';
 export type { Column, DataTableAction } from '../table/DataTable';
 export type { TabConfig } from '../layout/TabFormLayout';

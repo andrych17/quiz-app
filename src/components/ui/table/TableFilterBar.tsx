@@ -5,14 +5,26 @@ import { useState, ReactNode } from "react";
 export interface FilterOption {
   key: string;
   label: string;
-  type: 'text' | 'select' | 'date' | 'number';
+  type: 'text' | 'select' | 'date' | 'number' | 'boolean';
   placeholder?: string;
-  options?: { value: string | number; label: string }[];
-  value?: string | number;
+  options?: { value: string | number | boolean; label: string }[];
+  value?: string | number | boolean;
+  searchable?: boolean; // For select options with search
 }
 
 export interface TableFilters {
-  [key: string]: string | number | undefined;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export interface SortConfig {
+  field: string;
+  direction: 'ASC' | 'DESC';
+}
+
+export interface PaginationConfig {
+  page: number;
+  limit: number;
+  total: number;
 }
 
 interface TableFilterBarProps {
@@ -34,7 +46,7 @@ export default function TableFilterBar({
   className = "",
   children
 }: TableFilterBarProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const hasActiveFilters = Object.values(values).some(value => 
     value !== undefined && value !== "" && value !== null
@@ -46,6 +58,7 @@ export default function TableFilterBar({
 
   const renderFilterInput = (filter: FilterOption) => {
     const value = values[filter.key] || "";
+    const stringValue = typeof value === 'boolean' ? value.toString() : String(value);
 
     switch (filter.type) {
       case 'text':
@@ -53,7 +66,7 @@ export default function TableFilterBar({
           <input
             type="text"
             placeholder={filter.placeholder}
-            value={value}
+            value={stringValue}
             onChange={(e) => onChange(filter.key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
           />
@@ -64,22 +77,38 @@ export default function TableFilterBar({
           <input
             type="number"
             placeholder={filter.placeholder}
-            value={value}
+            value={stringValue}
             onChange={(e) => onChange(filter.key, e.target.value ? Number(e.target.value) : undefined)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
           />
         );
 
+      case 'boolean':
+        return (
+          <select
+            value={stringValue}
+            onChange={(e) => {
+              const val = e.target.value;
+              onChange(filter.key, val === '' ? undefined : val === 'true');
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
+          >
+            <option value="">{filter.placeholder || `All ${filter.label}`}</option>
+            <option value="true">Yes</option>
+            <option value="false">No</option>
+          </select>
+        );
+
       case 'select':
         return (
           <select
-            value={value}
+            value={stringValue}
             onChange={(e) => onChange(filter.key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
           >
             <option value="">{filter.placeholder || `Pilih ${filter.label}`}</option>
             {filter.options?.map((option) => (
-              <option key={option.value} value={option.value}>
+              <option key={String(option.value)} value={String(option.value)}>
                 {option.label}
               </option>
             ))}
@@ -90,7 +119,7 @@ export default function TableFilterBar({
         return (
           <input
             type="date"
-            value={value}
+            value={stringValue}
             onChange={(e) => onChange(filter.key, e.target.value)}
             className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm"
           />

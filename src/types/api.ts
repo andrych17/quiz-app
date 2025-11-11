@@ -54,7 +54,15 @@ export interface User {
   role: 'superadmin' | 'admin' | 'user';
   createdAt: string;
   updatedAt?: string;
+  locationId?: number;
+  serviceId?: number;
+  isActive?: boolean;
   location?: {
+    id: number;
+    key: string;
+    value: string;
+  };
+  service?: {
     id: number;
     key: string;
     value: string;
@@ -196,6 +204,17 @@ export interface PaginationParams {
   page?: number;
   limit?: number;
   search?: string;
+}
+
+export interface UserFilterParams extends PaginationParams {
+  name?: string;
+  email?: string;
+  role?: string;
+  locationId?: string | number;
+  serviceId?: string | number;
+  location?: string;
+  service?: string;
+  isActive?: string | boolean;
 }
 
 export interface CreateQuizDto {

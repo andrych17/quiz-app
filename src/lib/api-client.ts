@@ -3,6 +3,7 @@ import {
   ApiError, 
   PaginatedResponse, 
   PaginationParams,
+  UserFilterParams,
   AuthResponse,
   User,
   Quiz,
@@ -145,7 +146,7 @@ export class AuthAPI extends BaseApiClient {
  * User Management API client
  */
 export class UsersAPI extends BaseApiClient {
-  static async getUsers(params: PaginationParams = {}): Promise<ApiResponse<PaginatedResponse<User>>> {
+  static async getUsers(params: UserFilterParams = {}): Promise<ApiResponse<PaginatedResponse<User>>> {
     const queryString = this.buildParams(params);
     return this.request<PaginatedResponse<User>>(`/users${queryString}`);
   }

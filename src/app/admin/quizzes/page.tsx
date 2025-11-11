@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import DataTable, { Column, DataTableAction } from "@/components/ui/table/DataTable";
-import type { FilterOption, TableFilters } from "@/components/ui/table/TableFilterBar";
+import type { FilterOption, TableFilters, SortConfig } from "@/components/ui/table/TableFilterBar";
 import type { Quiz as ApiQuiz } from "@/types/api";
 import { API } from "@/lib/api-client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,40 +16,75 @@ export default function QuizzesPage() {
   const [limit, setLimit] = useState(10);
   const [total, setTotal] = useState(0);
   const [filterValues, setFilterValues] = useState<TableFilters>({});
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'createdAt', direction: 'DESC' });
+  const [locationOptions, setLocationOptions] = useState<Array<{value: string, label: string}>>([]);
+  const [serviceOptions, setServiceOptions] = useState<Array<{value: string, label: string}>>([]);
 
   const router = useRouter();
-  const { user, isAdmin, canAccessAllQuizzes } = useAuth();
+  const { canAccessAllQuizzes, isAdmin } = useAuth();
 
-  useEffect(() => {
-    loadQuizzes();
-  }, [page, limit, filterValues]);
 
-  const loadQuizzes = async () => {
+
+  const loadQuizzes = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
       const res = await API.quizzes.getQuizzes();
       
-      const response = res.data as any;
-      const quizzesData = response?.items || response?.data || res.data || [];
-      const totalCount = response?.total || response?.count || quizzesData.length;
+      const response = res.data as { items?: ApiQuiz[], data?: ApiQuiz[], total?: number, count?: number };
+      const quizzesData = response?.items || response?.data || (Array.isArray(res.data) ? res.data : []);
+      const totalCount = response?.total || response?.count || (Array.isArray(quizzesData) ? quizzesData.length : 0);
       
       setQuizzes(Array.isArray(quizzesData) ? quizzesData : []);
       setTotal(totalCount);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Failed to load quizzes', err);
-      setError(err?.message || 'Failed to load quizzes');
+      setError(err instanceof Error ? err.message : 'Failed to load quizzes');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  const loadConfigOptions = useCallback(async () => {
+    try {
+      // Load location options from backend API
+      const locationRes = await API.config.getConfigsByGroup('location');
+      const locationData = locationRes?.data || [];
+      const locationOpts = Array.isArray(locationData) ? locationData.map((config: { key: string, value: string }) => ({
+        value: config.key,
+        label: config.value
+      })) : [];
+      setLocationOptions(locationOpts);
+
+      // Load service options from backend API
+      const serviceRes = await API.config.getConfigsByGroup('service');
+      const serviceData = serviceRes?.data || [];
+      const serviceOpts = Array.isArray(serviceData) ? serviceData.map((config: { key: string, value: string }) => ({
+        value: config.key,
+        label: config.value
+      })) : [];
+      setServiceOptions(serviceOpts);
+    } catch (err) {
+      console.error('Failed to load config options:', err);
+      // If API fails or no data, set empty arrays
+      setLocationOptions([]);
+      setServiceOptions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Load config options first
+    loadConfigOptions();
+    // Load quizzes
+    loadQuizzes();
+  }, [loadQuizzes, loadConfigOptions]);
 
   const columns: Column[] = [
     {
       key: "title",
       label: "Quiz Title",
       sortable: true,
-      render: (value: any, row: ApiQuiz) => (
+      render: (value: unknown, row: ApiQuiz) => (
         <div>
           <div className="font-medium text-gray-900">{row.title}</div>
           <div className="text-sm text-gray-500">
@@ -62,7 +97,7 @@ export default function QuizzesPage() {
       key: "isPublished",
       label: "Status",
       sortable: true,
-      render: (value: any, row: ApiQuiz) => {
+      render: (value: unknown, row: ApiQuiz) => {
         const isPublished = row.isPublished;
         return (
           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gradient-to-r ${
@@ -81,7 +116,7 @@ export default function QuizzesPage() {
     {
       key: "questions",
       label: "Questions",
-      render: (value: any, row: ApiQuiz) => {
+      render: (value: unknown, row: ApiQuiz) => {
         const count = Array.isArray(row.questions) ? row.questions.length : 0;
         return (
           <div className="text-center">
@@ -95,7 +130,7 @@ export default function QuizzesPage() {
       key: "quizType",
       label: "Type",
       sortable: true,
-      render: (value: any, row: ApiQuiz) => {
+      render: (value: unknown, row: ApiQuiz) => {
         const type = row.quizType || 'Standard';
         return (
           <div className="text-center">
@@ -107,10 +142,41 @@ export default function QuizzesPage() {
       }
     },
     {
+      key: "service",
+      label: "Service",
+      render: (value: unknown, row: ApiQuiz) => {
+        const serviceName = serviceOptions.find(opt => opt.value === String(row.serviceType))?.label || row.serviceType || 'Not Assigned';
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-800">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2-2v2m8 0V6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V8a2 2 0 012-2V6" />
+            </svg>
+            {serviceName}
+          </span>
+        );
+      }
+    },
+    {
+      key: "location",
+      label: "Location",
+      render: () => {
+        // For now show a placeholder since quiz doesn't have location directly
+        return (
+          <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-50 text-green-800">
+            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            Global
+          </span>
+        );
+      }
+    },
+    {
       key: "createdAt",
       label: "Created",
       sortable: true,
-      render: (value: any, row: ApiQuiz) => {
+      render: (value: unknown, row: ApiQuiz) => {
         const date = new Date(row.createdAt || '');
         return (
           <div className="text-sm text-gray-600">
@@ -150,7 +216,7 @@ export default function QuizzesPage() {
   ];
 
   const handleEdit = (quiz: ApiQuiz) => {
-    router.push(`/admin/quizzes/${quiz.id}/edit`);
+    router.push(`/admin/quizzes/${quiz.id}`);
   };
 
   const handleDelete = (quiz: ApiQuiz) => {
@@ -159,16 +225,16 @@ export default function QuizzesPage() {
         try {
           await API.quizzes.deleteQuiz(Number(quiz.id));
           await loadQuizzes();
-        } catch (err: any) {
+        } catch (err: unknown) {
           console.error('Delete failed', err);
-          alert(err?.message || 'Delete failed');
+          alert(err instanceof Error ? err.message : 'Delete failed');
         }
       })();
     }
   };
 
-  // Filter options untuk tabel
-  const filters: FilterOption[] = [
+  // Filter options untuk tabel - using dynamic config data
+  const filters: FilterOption[] = useMemo(() => [
     {
       key: 'title',
       label: 'Title',
@@ -190,18 +256,37 @@ export default function QuizzesPage() {
         { value: 'true', label: 'Published' },
         { value: 'false', label: 'Draft' }
       ]
+    },
+    {
+      key: 'assignedLocation',
+      label: 'Assigned Location',
+      type: 'select',
+      placeholder: 'Choose Location',
+      options: locationOptions
+    },
+    {
+      key: 'assignedService',
+      label: 'Assigned Service',
+      type: 'select',
+      placeholder: 'Choose Service',
+      options: serviceOptions
     }
-  ];
+  ], [locationOptions, serviceOptions]);
 
-  const handleFilterChange = (filters: TableFilters) => {
+  const handleFilterChange = useCallback((filters: TableFilters) => {
     setFilterValues(filters);
     setPage(1); // Reset to first page when filtering
-  };
+  }, []);
 
-  const handleSort = (column: string, direction: 'asc' | 'desc') => {
-    // Implement sorting logic here
-    console.log('Sort:', column, direction);
-  };
+  const handleSort = useCallback((field: string, direction: 'ASC' | 'DESC') => {
+    setSortConfig({ field, direction });
+    console.log('Sort:', field, direction);
+  }, []);
+
+  const handleLimitChange = useCallback((newLimit: number) => {
+    setLimit(newLimit);
+    setPage(1); // Reset to first page when changing limit
+  }, []);
 
   if (loading) {
     return (
@@ -244,7 +329,7 @@ export default function QuizzesPage() {
         <div className="flex space-x-3">
           {isAdmin && (
             <button
-              onClick={() => router.push('/admin/quizzes/create')}
+              onClick={() => router.push('/admin/quizzes/new')}
               className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-medium rounded-lg hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200"
             >
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,6 +348,8 @@ export default function QuizzesPage() {
           data={quizzes}
           actions={actions}
           filters={filters}
+          filterValues={filterValues}
+          sortConfig={sortConfig}
           onFilterChange={handleFilterChange}
           onSort={handleSort}
           loading={loading}
@@ -277,10 +364,7 @@ export default function QuizzesPage() {
             limit,
             total,
             onPageChange: setPage,
-            onLimitChange: (newLimit) => {
-              setLimit(newLimit);
-              setPage(1);
-            }
+            onLimitChange: handleLimitChange
           }}
           showExport
           onExport={() => console.log('Export quizzes')}

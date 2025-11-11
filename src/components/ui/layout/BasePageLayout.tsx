@@ -56,7 +56,7 @@ export default function BasePageLayout({
     <div className="min-h-screen bg-gray-50">
       {/* Page Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto px-4 sm:px-6 lg:px-8">
           <div className="py-6">
             <div className="flex justify-between items-start">
               <div className="flex-1">
@@ -113,7 +113,7 @@ export default function BasePageLayout({
       </div>
 
       {/* Page Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {children}
       </div>
     </div>

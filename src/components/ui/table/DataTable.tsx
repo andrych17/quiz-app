@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import TableFilterBar, { FilterOption, TableFilters } from "./TableFilterBar";
+import TableFilterBar, { FilterOption, TableFilters, SortConfig } from "./TableFilterBar";
+import SortableHeader from "./SortableHeader";
 
 export interface Column {
   key: string;
@@ -27,8 +28,10 @@ interface DataTableProps {
   actions?: DataTableAction[];
   filters?: FilterOption[];
   defaultFilters?: TableFilters;
+  filterValues?: TableFilters;
   onFilterChange?: (filters: TableFilters) => void;
-  onSort?: (column: string, direction: 'asc' | 'desc') => void;
+  sortConfig?: SortConfig;
+  onSort?: (field: string, direction: 'ASC' | 'DESC') => void;
   loading?: boolean;
   emptyMessage?: string;
   emptyIcon?: React.ReactNode;
@@ -53,7 +56,9 @@ export default function DataTable({
   actions,
   filters = [],
   defaultFilters = {},
+  filterValues: externalFilterValues,
   onFilterChange,
+  sortConfig,
   onSort,
   loading = false,
   emptyMessage = "Tidak ada data yang tersedia",
@@ -66,31 +71,21 @@ export default function DataTable({
   onExport,
   className = ""
 }: DataTableProps) {
-  const [sortColumn, setSortColumn] = useState<string>("");
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [filterValues, setFilterValues] = useState<TableFilters>(defaultFilters);
+  
+  // Use external filter values if provided, otherwise use internal state
+  const filterValues = externalFilterValues || defaultFilters;
 
-  useEffect(() => {
-    onFilterChange?.(filterValues);
-  }, [filterValues, onFilterChange]);
-
-  const handleSort = (columnKey: string) => {
-    const column = columns.find(col => col.key === columnKey);
-    if (!column?.sortable) return;
-
-    const direction = sortColumn === columnKey && sortDirection === 'asc' ? 'desc' : 'asc';
-    setSortColumn(columnKey);
-    setSortDirection(direction);
-    onSort?.(columnKey, direction);
+  const handleSort = (field: string, direction: 'ASC' | 'DESC') => {
+    onSort?.(field, direction);
   };
 
   const handleFilterChange = (key: string, value: string | number | undefined) => {
     const newFilters = { ...filterValues, [key]: value };
-    setFilterValues(newFilters);
+    onFilterChange?.(newFilters);
   };
 
   const handleClearFilters = () => {
-    setFilterValues({});
+    onFilterChange?.({});
   };
 
   const getActionButtonClass = (variant: string = 'secondary') => {
@@ -145,44 +140,15 @@ export default function DataTable({
             <thead className="bg-gray-50">
               <tr>
                 {columns.map((column) => (
-                  <th
+                  <SortableHeader
                     key={column.key}
-                    onClick={() => handleSort(column.key)}
-                    className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
-                      column.sortable ? 'cursor-pointer hover:bg-gray-100 select-none' : ''
-                    } ${column.className || ''}`}
-                    style={column.width ? { width: column.width } : undefined}
-                  >
-                    <div className="flex items-center space-x-1">
-                      <span>{column.label}</span>
-                      {column.sortable && (
-                        <div className="flex flex-col">
-                          <svg
-                            className={`w-3 h-3 ${
-                              sortColumn === column.key && sortDirection === 'asc'
-                                ? 'text-blue-600'
-                                : 'text-gray-400'
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path fillRule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clipRule="evenodd" />
-                          </svg>
-                          <svg
-                            className={`w-3 h-3 -mt-1 ${
-                              sortColumn === column.key && sortDirection === 'desc'
-                                ? 'text-blue-600'
-                                : 'text-gray-400'
-                            }`}
-                            fill="currentColor"
-                            viewBox="0 0 20 20"
-                          >
-                            <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      )}
-                    </div>
-                  </th>
+                    field={column.key}
+                    label={column.label}
+                    sortConfig={sortConfig}
+                    onSort={handleSort}
+                    sortable={column.sortable}
+                    className={column.className}
+                  />
                 ))}
                 {actions && actions.length > 0 && (
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
