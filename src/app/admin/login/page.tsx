@@ -191,16 +191,25 @@ export default function AdminLoginPage() {
               <svg className="w-4 h-4 text-blue-600 mr-2" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              <p className="text-sm text-blue-800 font-semibold">Demo Access</p>
+              <p className="text-sm text-blue-800 font-semibold">Demo Accounts</p>
             </div>
-            <p className="text-sm text-blue-700">
-              <strong>Email:</strong> admin@quiz-app.com<br />
-              <strong>Password:</strong> password123
-            </p>
-            <p className="text-sm text-blue-700">
-              <strong>Email:</strong> admin@gms.com<br />
-              <strong>Password:</strong> password123
-            </p>
+            <div className="space-y-2 text-sm text-blue-700">
+              <div>
+                <strong>Superadmin:</strong><br />
+                Email: superadmin@gms.com<br />
+                Password: password123
+              </div>
+              <div>
+                <strong>Admin Jakarta:</strong><br />
+                Email: admin.jakarta@gms.com<br />
+                Password: password123
+              </div>
+              <div>
+                <strong>Admin Surabaya:</strong><br />
+                Email: admin.surabaya@gms.com<br />
+                Password: password123
+              </div>
+            </div>
           </div>
 
           <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">

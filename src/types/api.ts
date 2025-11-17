@@ -54,16 +54,14 @@ export interface User {
   role: 'superadmin' | 'admin' | 'user';
   createdAt: string;
   updatedAt?: string;
-  locationId?: number;
-  serviceId?: number;
+  locationKey?: string;
+  serviceKey?: string;
   isActive?: boolean;
   location?: {
-    id: number;
     key: string;
     value: string;
   };
   service?: {
-    id: number;
     key: string;
     value: string;
   };

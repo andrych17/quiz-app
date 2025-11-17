@@ -40,22 +40,28 @@ export interface PaginatedResponse<T> {
   pagination: PaginationMeta;
 }
 
-// User Types with Service/Location Relations
+// User Types with Key-Based Service/Location Storage (Updated November 2025)
 export interface User {
   id: number;
   name: string;
   email: string;
   role: 'superadmin' | 'admin' | 'user';
-  serviceId?: number;
-  locationId?: number;
-  service?: ConfigItem;
-  location?: ConfigItem;
+  serviceKey: string; // 'sm', 'am', 'tech_support', 'all_services'
+  locationKey: string; // 'jakarta_pusat', 'jakarta_utara', 'all_locations'
+  service?: {
+    key: string;
+    value: string; // Display name from config lookup
+  };
+  location?: {
+    key: string;
+    value: string; // Display name from config lookup
+  };
   assignedQuizzes?: Quiz[];
   createdAt: string;
   updatedAt: string;
 }
 
-// Quiz Types with Enhanced Relations
+// Quiz Types with Key-Based Service/Location Storage (Updated November 2025)
 export interface Quiz {
   id: number;
   title: string;
@@ -63,15 +69,22 @@ export interface Quiz {
   slug: string;
   token: string;
   quizType: 'scheduled' | 'manual';
+  serviceKey: string; // Key-based service targeting
+  locationKey: string; // Key-based location targeting
+  service?: {
+    key: string;
+    value: string; // Display name from config lookup
+  };
+  location?: {
+    key: string;
+    value: string; // Display name from config lookup
+  };
   startDateTime?: string;
   endDateTime?: string;
   durationMinutes: number;
+  passingScore?: number;
   isActive: boolean;
   isPublished: boolean;
-  serviceId?: number;
-  locationId?: number;
-  service?: ConfigItem;
-  location?: ConfigItem;
   questions?: Question[];
   scoringTemplates?: QuizScoring[];
   assignedUsers?: User[];
@@ -215,9 +228,15 @@ export class EnhancedApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = `${this.baseUrl}${endpoint}`;
+    
+    // Get token from storage if not set in instance
+    const token = this.token || (typeof window !== 'undefined' 
+      ? localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token')
+      : null);
+    
     const headers = {
       'Content-Type': 'application/json',
-      ...(this.token && { Authorization: `Bearer ${this.token}` }),
+      ...(token && { Authorization: `Bearer ${token}` }),
       ...options.headers,
     };
 
@@ -255,13 +274,13 @@ export class EnhancedApiClient {
     return this.request<User>('/auth/profile');
   }
 
-  // Users API with Enhanced Filtering & Sorting
+  // Users API with Key-Based Filtering & Sorting (Updated November 2025)
   async getUsers(options?: {
     pagination?: Pick<PaginationConfig, 'page' | 'limit'>;
     search?: string;
     filters?: {
-      serviceId?: number;
-      locationId?: number;
+      serviceKey?: string; // Updated to key-based filtering
+      locationKey?: string; // Updated to key-based filtering
       role?: string;
     };
     sort?: SortConfig;
@@ -278,10 +297,10 @@ export class EnhancedApiClient {
       query.search(options.search);
     }
 
-    // Apply filters
+    // Apply key-based filters
     if (options?.filters) {
-      if (options.filters.serviceId) query.filter('serviceId', options.filters.serviceId);
-      if (options.filters.locationId) query.filter('locationId', options.filters.locationId);
+      if (options.filters.serviceKey) query.filter('serviceKey', options.filters.serviceKey);
+      if (options.filters.locationKey) query.filter('locationKey', options.filters.locationKey);
       if (options.filters.role) query.filter('role', options.filters.role);
     }
 
@@ -305,8 +324,8 @@ export class EnhancedApiClient {
     email: string;
     password: string;
     role: string;
-    serviceId?: number;
-    locationId?: number;
+    serviceKey: string; // Updated to key-based
+    locationKey: string; // Updated to key-based
   }) {
     return this.request<User>('/users', {
       method: 'POST',
@@ -327,13 +346,13 @@ export class EnhancedApiClient {
     });
   }
 
-  // Quizzes API with Enhanced Filtering & Sorting
+  // Quizzes API with Key-Based Filtering & Sorting (Updated November 2025)
   async getQuizzes(options?: {
     pagination?: Pick<PaginationConfig, 'page' | 'limit'>;
     search?: string;
     filters?: {
-      serviceId?: number;
-      locationId?: number;
+      serviceKey?: string; // Updated to key-based filtering
+      locationKey?: string; // Updated to key-based filtering
       isActive?: boolean;
     };
     sort?: SortConfig;
@@ -350,10 +369,10 @@ export class EnhancedApiClient {
       query.search(options.search);
     }
 
-    // Apply filters
+    // Apply key-based filters
     if (options?.filters) {
-      if (options.filters.serviceId) query.filter('serviceId', options.filters.serviceId);
-      if (options.filters.locationId) query.filter('locationId', options.filters.locationId);
+      if (options.filters.serviceKey) query.filter('serviceKey', options.filters.serviceKey);
+      if (options.filters.locationKey) query.filter('locationKey', options.filters.locationKey);
       if (options.filters.isActive !== undefined) query.filter('isActive', options.filters.isActive);
     }
 
@@ -379,8 +398,9 @@ export class EnhancedApiClient {
     startDateTime?: string;
     endDateTime?: string;
     durationMinutes: number;
-    serviceId?: number;
-    locationId?: number;
+    serviceKey: string; // Updated to key-based
+    locationKey: string; // Updated to key-based
+    passingScore?: number;
   }) {
     return this.request<Quiz>('/quizzes', {
       method: 'POST',
@@ -499,6 +519,94 @@ export class ApiError extends Error {
     }, {} as Record<string, string>);
   }
 }
+
+// Key-Based Storage Utilities (Added November 2025)
+export const KeyBasedUtils = {
+  // Service Key Constants
+  SERVICE_KEYS: {
+    ALL_SERVICES: 'all_services',
+    SM: 'sm',
+    AM: 'am', 
+    TECH_SUPPORT: 'tech_support',
+    NETM: 'netm',
+    CS: 'cs',
+    IT_SUPPORT: 'it_support',
+    BD: 'bd',
+    QA: 'qa'
+  },
+
+  // Location Key Constants
+  LOCATION_KEYS: {
+    ALL_LOCATIONS: 'all_locations',
+    JAKARTA_PUSAT: 'jakarta_pusat',
+    JAKARTA_UTARA: 'jakarta_utara', 
+    JAKARTA_SELATAN: 'jakarta_selatan',
+    JAKARTA_BARAT: 'jakarta_barat',
+    JAKARTA_TIMUR: 'jakarta_timur',
+    SURABAYA: 'surabaya',
+    BANDUNG: 'bandung',
+    MEDAN: 'medan',
+    SEMARANG: 'semarang',
+    MAKASSAR: 'makassar',
+    TANGERANG: 'tangerang',
+    BEKASI: 'bekasi',
+    DEPOK: 'depok'
+  },
+
+  // Get service display name from key
+  getServiceDisplayName: (serviceKey: string, services: ConfigItem[]): string => {
+    const service = services.find(s => s.key === serviceKey);
+    return service?.value || serviceKey;
+  },
+
+  // Get location display name from key  
+  getLocationDisplayName: (locationKey: string, locations: ConfigItem[]): string => {
+    const location = locations.find(l => l.key === locationKey);
+    return location?.value || locationKey;
+  },
+
+  // Check if user is superadmin
+  isSuperAdmin: (user: User): boolean => {
+    return user.role === 'superadmin' || 
+           (user.serviceKey === KeyBasedUtils.SERVICE_KEYS.ALL_SERVICES && 
+            user.locationKey === KeyBasedUtils.LOCATION_KEYS.ALL_LOCATIONS);
+  },
+
+  // Check if user can access specific service/location
+  canAccessQuiz: (user: User, quiz: Quiz): boolean => {
+    if (KeyBasedUtils.isSuperAdmin(user)) return true;
+    
+    return user.serviceKey === quiz.serviceKey && 
+           user.locationKey === quiz.locationKey;
+  },
+
+  // Build filter params for API calls
+  buildFilterParams: (filters: Record<string, any>): string => {
+    const params = new URLSearchParams();
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        params.append(key, value.toString());
+      }
+    });
+    
+    return params.toString();
+  },
+
+  // Format user for display
+  formatUserDisplay: (user: User): string => {
+    const service = user.service?.value || user.serviceKey;
+    const location = user.location?.value || user.locationKey;
+    return `${user.name} (${service} - ${location})`;
+  },
+
+  // Format quiz for display
+  formatQuizDisplay: (quiz: Quiz): string => {
+    const service = quiz.service?.value || quiz.serviceKey;
+    const location = quiz.location?.value || quiz.locationKey;
+    return `${quiz.title} (${service} - ${location})`;
+  }
+};
 
 // Create singleton instance
 export const api = new EnhancedApiClient();

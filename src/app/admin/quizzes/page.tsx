@@ -25,15 +25,29 @@ export default function QuizzesPage() {
 
 
 
-  const loadQuizzes = useCallback(async () => {
+  const loadQuizzes = useCallback(async (filters: TableFilters = {}, sort?: SortConfig, currentPage: number = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await API.quizzes.getQuizzes();
+        // Prepare API parameters to match API client structure
+      const apiParams = {
+        filters: Object.keys(filters).length > 0 ? filters : undefined,
+        sort: sort ? {
+          field: sort.field,
+          direction: sort.direction
+        } : undefined,
+        page: currentPage,
+        limit: 10
+      };
+      
+      const res = await API.quizzes.getQuizzes(apiParams);
       
       const response = res.data as { items?: ApiQuiz[], data?: ApiQuiz[], total?: number, count?: number };
       const quizzesData = response?.items || response?.data || (Array.isArray(res.data) ? res.data : []);
       const totalCount = response?.total || response?.count || (Array.isArray(quizzesData) ? quizzesData.length : 0);
+      
+      console.log('📥 API response - quiz count:', quizzesData.length);
+      console.log('📥 API response - total:', totalCount);
       
       setQuizzes(Array.isArray(quizzesData) ? quizzesData : []);
       setTotal(totalCount);
@@ -276,7 +290,10 @@ export default function QuizzesPage() {
   const handleFilterChange = useCallback((filters: TableFilters) => {
     setFilterValues(filters);
     setPage(1); // Reset to first page when filtering
-  }, []);
+    
+    // Make API call with new filters
+    loadQuizzes(filters, sortConfig, 1);
+  }, [loadQuizzes, sortConfig]);
 
   const handleSort = useCallback((field: string, direction: 'ASC' | 'DESC') => {
     setSortConfig({ field, direction });

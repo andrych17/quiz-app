@@ -38,17 +38,17 @@ export class BaseApiClient {
 
     // Add authorization header if token exists
     // Check both localStorage and sessionStorage for token
-    const token = typeof window !== 'undefined' 
-      ? localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token')
-      : null;
+    const localToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
+    const sessionToken = typeof window !== 'undefined' ? sessionStorage.getItem('admin_token') : null;
+    const token = localToken || sessionToken;
+    
+
+    
+
+    
     if (token) {
       defaultHeaders['Authorization'] = `Bearer ${token}`;
-      console.log('Adding auth header with token:', token.substring(0, 20) + '...');
-    } else {
-      console.log('No token found in storage');
     }
-
-    console.log(`API Request: ${options.method || 'GET'} ${url}`);
 
     try {
       const response = await fetch(url, {
@@ -78,7 +78,6 @@ export class BaseApiClient {
         throw error;
       }
       
-      console.error('API Request failed:', error);
       throw new ApiError(
         error instanceof Error ? error.message : 'Network error occurred'
       );
@@ -183,8 +182,42 @@ export class UsersAPI extends BaseApiClient {
  * - User: sees only published quizzes
  */
 export class QuizzesAPI extends BaseApiClient {
-  static async getQuizzes(): Promise<ApiResponse<Quiz[]>> {
-    return this.request<Quiz[]>('/quizzes');
+  static async getQuizzes(params?: {
+    filters?: { [key: string]: string | number | boolean | undefined };
+    sort?: { field: string; direction: 'ASC' | 'DESC' };
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<Quiz[]>> {
+    let url = '/quizzes';
+    
+    if (params) {
+      const queryParams = new URLSearchParams();
+      
+      // Add filter parameters
+      if (params.filters) {
+        Object.entries(params.filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(`filter[${key}]`, String(value));
+          }
+        });
+      }
+      
+      // Add sort parameters
+      if (params.sort) {
+        queryParams.append('sort', params.sort.field);
+        queryParams.append('order', params.sort.direction);
+      }
+      
+      // Add pagination parameters
+      if (params.page) queryParams.append('page', String(params.page));
+      if (params.limit) queryParams.append('limit', String(params.limit));
+      
+      if (queryParams.toString()) {
+        url += `?${queryParams.toString()}`;
+      }
+    }
+    
+    return this.request<Quiz[]>(url);
   }
 
   static async getQuiz(id: number): Promise<ApiResponse<Quiz>> {

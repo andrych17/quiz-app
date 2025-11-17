@@ -2,7 +2,10 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useCallback } from 'react';
 import { User, ApiError } from '@/types/api';
-import { API } from '@/lib/api-client';
+import { EnhancedApiClient } from '@/lib/enhanced-api-client';
+
+// Initialize API client
+const api = new EnhancedApiClient();
 
 // Auth state interface
 export interface AuthState {
@@ -130,10 +133,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           let savedRefreshToken = localStorage.getItem('admin_refresh_token') || sessionStorage.getItem('admin_refresh_token');
           const rememberMe = !!localStorage.getItem('admin_token'); // If token in localStorage, user chose remember me
           
+
+          
           if (savedToken) {
             // Validate session with backend
             try {
-              const response = await API.auth.getProfile();
+              const response = await api.getProfile();
               dispatch({
                 type: 'LOGIN_SUCCESS',
                 payload: {
@@ -144,12 +149,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 },
               });
             } catch (error) {
-              console.log('Token validation failed, clearing storage:', error);
-              // Invalid session, clear storage from both locations
-              localStorage.removeItem('admin_token');
-              localStorage.removeItem('admin_refresh_token');
-              sessionStorage.removeItem('admin_token');
-              sessionStorage.removeItem('admin_refresh_token');
+              // Invalid session, let the logout action handle clearing storage
+              dispatch({ type: 'LOGOUT' });
               dispatch({ type: 'LOGOUT' });
             }
           } else {
@@ -173,12 +174,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, []);
 
+  // Token monitoring - watch for token disappearance
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const tokenMonitor = setInterval(() => {
+      const currentLocalToken = localStorage.getItem('admin_token');
+      const currentSessionToken = sessionStorage.getItem('admin_token');
+      const hasAnyToken = !!(currentLocalToken || currentSessionToken);
+      
+      if (state.isAuthenticated && !hasAnyToken) {
+        // Force logout if token disappeared
+        dispatch({ type: 'LOGOUT' });
+      }
+    }, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(tokenMonitor);
+  }, [state.isAuthenticated, state.token]);
+
   // Save tokens to appropriate storage based on rememberMe setting
   useEffect(() => {
-    if (typeof window !== 'undefined') {
+
+    
+    // Only manage storage if not currently loading (avoid race conditions)
+    if (typeof window !== 'undefined' && !state.isLoading) {
       const isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
       
-      if (state.token) {
+      if (state.token && state.isAuthenticated) {
         // Save to appropriate storage based on rememberMe
         if (state.rememberMe) {
           localStorage.setItem('admin_token', state.token);
@@ -194,14 +216,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? `${cookieValue}; samesite=lax`  // For localhost, use lax instead of strict
           : `${cookieValue}; secure; samesite=strict`; // For production
         document.cookie = cookieSettings;
-        console.log(`Token saved to ${state.rememberMe ? 'localStorage' : 'sessionStorage'} and cookie:`, state.token.substring(0, 20) + '...');
-      } else {
-        // Clear from both storages
+      } else if (!state.token && !state.isAuthenticated && !state.isLoading) {
+        // Only clear if we're definitely logged out (not during initialization)
         localStorage.removeItem('admin_token');
         sessionStorage.removeItem('admin_token');
+        
         // Clear cookie
         document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
-        console.log('Token cleared from all storage');
       }
 
       if (state.refreshToken) {
@@ -225,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         document.cookie = 'admin_refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
       }
     }
-  }, [state.token, state.refreshToken, state.rememberMe]);
+  }, [state.token, state.refreshToken, state.rememberMe, state.isAuthenticated, state.isLoading]);
 
   // Clear storage when logout happens
   useEffect(() => {
@@ -272,21 +293,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       dispatch({ type: 'SET_LOADING', payload: true });
       dispatch({ type: 'SET_ERROR', payload: null });
       
-      console.log('Attempting login with:', email, 'Remember me:', rememberMe);
-      const response = await API.auth.login(email, password);
-      console.log('Login response (structured):', response);
+      const response = await api.login(email, password);
 
       // Extract auth data from standardized response
       const authData = response.data!;
-      
-      console.log('Token extracted:', authData.access_token.substring(0, 20) + '...');
       
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
           user: authData.user,
           token: authData.access_token,
-          refreshToken: authData.refresh_token || '',
+          refreshToken: '', // Enhanced API client doesn't provide refresh token yet
           rememberMe: rememberMe,
         },
       });
@@ -313,29 +330,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       dispatch({ type: 'SET_LOADING', payload: true });
       
-      // Call logout API
-      await API.auth.logout();
+      // Call logout API (if available)
+      // Note: Enhanced API client doesn't have logout endpoint yet
+      // await api.logout();
     } catch (error) {
       console.error('Logout API failed:', error);
       // Still logout locally even if API fails
     } finally {
       dispatch({ type: 'LOGOUT' });
     }
-  }, []);
+  }, [state.isAuthenticated, state.token, state.user?.email]);
 
   const refreshTokens = useCallback(async () => {
     if (!state.refreshToken) return;
 
     try {
-      const response = await API.auth.refreshToken(state.refreshToken);
+      // Note: Enhanced API client doesn't have refresh token endpoint yet
+      // const response = await api.refreshToken(state.refreshToken);
       
-      dispatch({
-        type: 'REFRESH_TOKEN',
-        payload: {
-          token: response.data!.access_token,
-          refreshToken: response.data!.refresh_token,
-        },
-      });
+      // For now, just throw error to trigger re-authentication
+      throw new Error('Token refresh not implemented in Enhanced API client yet');
+      
+      // dispatch({
+      //   type: 'REFRESH_TOKEN',
+      //   payload: {
+      //     token: response.data!.access_token,
+      //     refreshToken: response.data!.refresh_token,
+      //   },
+      // });
     } catch (error) {
       console.error('Token refresh failed:', error);
       throw error;

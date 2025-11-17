@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { TextField } from "@/components/ui/common";
+import { API } from "@/lib/api-client";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -35,6 +36,9 @@ export default function ProfilePage() {
 
   const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
   const [isEditing, setIsEditing] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
+  
   const [editForm, setEditForm] = useState({
     name: user.name,
     email: user.email,
@@ -49,38 +53,82 @@ export default function ProfilePage() {
     confirmPassword: ""
   });
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  // Auto-hide messages after 5 seconds
+  useEffect(() => {
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    setUser({
-      ...user,
-      name: editForm.name,
-      email: editForm.email,
-      nij: editForm.nij,
-      phone: editForm.phone,
-      address: editForm.address
-    });
-    setIsEditing(false);
-    alert("Profile updated successfully!");
+    setIsLoading(true);
+    setMessage(null);
+    
+    try {
+      // In a real app, you would call the API here
+      // const response = await API.users.updateProfile(editForm);
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      setUser({
+        ...user,
+        name: editForm.name,
+        email: editForm.email,
+        nij: editForm.nij,
+        phone: editForm.phone,
+        address: editForm.address
+      });
+      
+      setIsEditing(false);
+      setMessage({ type: 'success', text: 'Profile updated successfully!' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handlePasswordChange = (e: React.FormEvent) => {
+  const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage(null);
+    
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      alert("New passwords do not match!");
+      setMessage({ type: 'error', text: 'New passwords do not match!' });
       return;
     }
     if (passwordForm.newPassword.length < 6) {
-      alert("Password must be at least 6 characters!");
+      setMessage({ type: 'error', text: 'Password must be at least 6 characters!' });
       return;
     }
     
-    // Reset form
-    setPasswordForm({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: ""
-    });
-    alert("Password changed successfully!");
+    setIsLoading(true);
+    
+    try {
+      // In a real app, you would call the API here
+      // const response = await API.auth.changePassword({
+      //   currentPassword: passwordForm.currentPassword,
+      //   newPassword: passwordForm.newPassword
+      // });
+      
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Reset form
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: ""
+      });
+      
+      setMessage({ type: 'success', text: 'Password changed successfully!' });
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Failed to change password. Please check your current password and try again.' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -118,6 +166,28 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold text-gray-900">👤 My Profile</h1>
         <p className="text-gray-600 mt-2">Manage your account settings and preferences</p>
       </div>
+
+      {/* Message Display */}
+      {message && (
+        <div className={`mb-6 p-4 rounded-lg border ${
+          message.type === 'success' 
+            ? 'bg-green-50 border-green-200 text-green-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        }`}>
+          <div className="flex items-center">
+            {message.type === 'success' ? (
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+              </svg>
+            )}
+            {message.text}
+          </div>
+        </div>
+      )}
 
       {/* Profile Card */}
       <div className="bg-white rounded-lg shadow-md p-6 mb-8">
@@ -257,12 +327,19 @@ export default function ProfilePage() {
                 />
               </div>
               
-              <div className="flex space-x-3 pt-4">
+              <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="submit"
-                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
+                  disabled={isLoading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
-                  Save Changes
+                  {isLoading && (
+                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isLoading ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -370,39 +447,22 @@ export default function ProfilePage() {
                 </div>
               </div>
               
-              <button
-                type="submit"
-                className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Update Password
-              </button>
+              <div className="flex justify-end">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                >
+                  {isLoading && (
+                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                  )}
+                  {isLoading ? 'Updating...' : 'Update Password'}
+                </button>
+              </div>
             </form>
-          </div>
-
-          {/* Account Security Info */}
-          <div>
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Account Security</h4>
-            <div className="space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium text-gray-900">Two-Factor Authentication</p>
-                  <p className="text-sm text-gray-600">Add an extra layer of security to your account</p>
-                </div>
-                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                  Coming Soon
-                </span>
-              </div>
-              
-              <div className="flex items-center justify-between py-2">
-                <div>
-                  <p className="font-medium text-gray-900">Login Notifications</p>
-                  <p className="text-sm text-gray-600">Get notified when someone logs into your account</p>
-                </div>
-                <span className="px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                  Enabled
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       )}
