@@ -5,6 +5,20 @@ import { adminAuthAPI } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 
 export default function AuthTestPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return <div>Loading...</div>;
+  }
+
+  return <AuthTestContent />;
+}
+
+function AuthTestContent() {
   const [result, setResult] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [tokenInfo, setTokenInfo] = useState<{

@@ -176,9 +176,9 @@ export default function UsersPage() {
       key: "service",
       label: "Service",
       render: (value: unknown, row: ApiUser) => {
-        // Try to get service name from the service object first, then from serviceId, then from serviceOptions
+        // Try to get service name from the service object first, then from serviceKey, then from serviceOptions
         const serviceName = row.service?.value || 
-                           serviceOptions.find(opt => opt.value === String(row.serviceId))?.label || 
+                           serviceOptions.find(opt => opt.value === row.serviceKey)?.label || 
                            'Not Assigned';
         return (
           <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-800">
@@ -194,9 +194,9 @@ export default function UsersPage() {
       key: "location",
       label: "Location",
       render: (value: unknown, row: ApiUser) => {
-        // Try to get location name from the location object first, then from locationId, then from locationOptions
+        // Try to get location name from the location object first, then from locationKey, then from locationOptions
         const locationName = row.location?.value || 
-                            locationOptions.find(opt => opt.value === String(row.location?.key))?.label || 
+                            locationOptions.find(opt => opt.value === row.locationKey)?.label || 
                             'Not Assigned';
         return (
           <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-green-50 text-green-800">

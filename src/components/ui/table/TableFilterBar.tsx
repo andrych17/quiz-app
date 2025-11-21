@@ -30,7 +30,7 @@ export interface PaginationConfig {
 interface TableFilterBarProps {
   filters: FilterOption[];
   values: TableFilters;
-  onChange: (key: string, value: string | number | undefined) => void;
+  onChange: (key: string, value: string | number | boolean | undefined) => void;
   onClear: () => void;
   onSearch?: () => void;
   className?: string;

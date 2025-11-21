@@ -129,8 +129,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (typeof window !== 'undefined') {
           // Try localStorage first (remember me), then sessionStorage
-          let savedToken = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
-          let savedRefreshToken = localStorage.getItem('admin_refresh_token') || sessionStorage.getItem('admin_refresh_token');
+          const savedToken = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+          const savedRefreshToken = localStorage.getItem('admin_refresh_token') || sessionStorage.getItem('admin_refresh_token');
           const rememberMe = !!localStorage.getItem('admin_token'); // If token in localStorage, user chose remember me
           
 

@@ -1,10 +1,7 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { API } from "@/lib/api-client";
-import type { Config as ApiConfig } from "@/types/api";
-import { useAuth } from "@/contexts/AuthContext";
 
 // Mock data for configurations
 const mockConfigs = [
@@ -28,8 +25,7 @@ const mockConfigs = [
 
 export default function ConfigPage() {
   const router = useRouter();
-  const [configs, setConfigs] = useState(mockConfigs);
-  const [loading, setLoading] = useState(false);
+  const [configs] = useState(mockConfigs);
 
   const handleCreate = () => {
     router.push("/admin/config/new");

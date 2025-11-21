@@ -79,7 +79,7 @@ export default function DataTable({
     onSort?.(field, direction);
   };
 
-  const handleFilterChange = (key: string, value: string | number | undefined) => {
+  const handleFilterChange = (key: string, value: string | number | boolean | undefined) => {
     const newFilters = { ...filterValues, [key]: value };
     onFilterChange?.(newFilters);
   };
