@@ -190,32 +190,60 @@ export class QuizzesAPI extends BaseApiClient {
   }): Promise<ApiResponse<Quiz[]>> {
     let url = '/quizzes';
     
+    console.log('🔧 QuizzesAPI.getQuizzes called with params:', params);
+    
     if (params) {
       const queryParams = new URLSearchParams();
       
-      // Add filter parameters
+      // Add filter parameters with correct mapping
       if (params.filters) {
+        console.log('🔧 Processing filters:', params.filters);
         Object.entries(params.filters).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== '') {
-            queryParams.append(`filter[${key}]`, String(value));
+            // Map frontend filter keys to backend parameter names
+            let backendKey = key;
+            if (key === 'assignedService') {
+              backendKey = 'serviceKey';
+            } else if (key === 'assignedLocation') {
+              backendKey = 'locationKey';
+            } else if (key === 'isPublished') {
+              backendKey = 'isPublished';
+            } else if (key === 'title') {
+              backendKey = 'title';
+            } else if (key === 'description') {
+              backendKey = 'description';
+            }
+            
+            const filterValue = String(value);
+            console.log(`🔧 Adding filter parameter: ${backendKey}=${filterValue} (mapped from ${key})`);
+            queryParams.append(backendKey, filterValue);
           }
         });
       }
       
       // Add sort parameters
       if (params.sort) {
+        console.log('🔧 Adding sort:', params.sort);
         queryParams.append('sort', params.sort.field);
         queryParams.append('order', params.sort.direction);
       }
       
       // Add pagination parameters
-      if (params.page) queryParams.append('page', String(params.page));
-      if (params.limit) queryParams.append('limit', String(params.limit));
+      if (params.page) {
+        console.log('🔧 Adding page:', params.page);
+        queryParams.append('page', String(params.page));
+      }
+      if (params.limit) {
+        console.log('🔧 Adding limit:', params.limit);
+        queryParams.append('limit', String(params.limit));
+      }
       
       if (queryParams.toString()) {
         url += `?${queryParams.toString()}`;
       }
     }
+    
+    console.log('🔧 Final API URL:', url);
     
     return this.request<Quiz[]>(url);
   }
@@ -520,8 +548,9 @@ export class QuizSessionsAPI extends BaseApiClient {
  * Configuration Management API client
  */
 export class ConfigAPI extends BaseApiClient {
-  static async getConfigs(): Promise<ApiResponse<Config[]>> {
-    return this.request<Config[]>('/config');
+  static async getConfigs(params?: PaginationParams): Promise<ApiResponse<PaginatedResponse<Config>>> {
+    const queryString = params ? `?${new URLSearchParams(params as any).toString()}` : '';
+    return this.request<PaginatedResponse<Config>>(`/config${queryString}`);
   }
 
   static async getConfig(id: number): Promise<ApiResponse<Config>> {
@@ -536,14 +565,14 @@ export class ConfigAPI extends BaseApiClient {
     return this.request<Config[]>('/config/locations');
   }
 
-  static async createConfig(configData: Omit<Config, 'id' | 'createdAt'>): Promise<ApiResponse<Config>> {
+  static async createConfig(configData: Omit<Config, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>): Promise<ApiResponse<Config>> {
     return this.request<Config>('/config', {
       method: 'POST',
       body: JSON.stringify(configData),
     });
   }
 
-  static async updateConfig(id: number, configData: Partial<Omit<Config, 'id' | 'createdAt'>>): Promise<ApiResponse<Config>> {
+  static async updateConfig(id: number, configData: Partial<Omit<Config, 'id' | 'createdAt' | 'updatedAt' | 'createdBy' | 'updatedBy'>>): Promise<ApiResponse<Config>> {
     return this.request<Config>(`/config/${id}`, {
       method: 'PUT',
       body: JSON.stringify(configData),
