@@ -3,55 +3,59 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { TextField } from "@/components/ui/common";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { API } from "@/lib/api-client";
+import type { User } from "@/types/api";
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user: authUser } = useAuth();
   
-  const [user, setUser] = useState({
-    name: authUser?.name || "Demo Administrator",
-    email: authUser?.email || "admin@example.com",
-    nij: "12345678",
-    role: authUser?.role || "admin",
-    phone: "+62 812-3456-7890",
-    address: "Jakarta, Indonesia",
-    createdAt: authUser?.createdAt || "2024-01-15",
-    lastLogin: new Date().toISOString()
-  });
-  
-  // Update local state when auth user changes
-  useEffect(() => {
-    if (authUser) {
-      setUser(prev => ({
-        ...prev,
-        name: authUser.name || "Demo Administrator",
-        email: authUser.email || "admin@example.com",
-        role: authUser.role || "admin",
-        createdAt: authUser.createdAt || "2024-01-15"
-      }));
-    }
-  }, [authUser]);
-
-  const [activeTab, setActiveTab] = useState<'profile' | 'security'>('profile');
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{type: 'success' | 'error', text: string} | null>(null);
   
   const [editForm, setEditForm] = useState({
-    name: user.name,
-    email: user.email,
-    nij: user.nij,
-    phone: user.phone,
-    address: user.address
-  });
-
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: "",
-    newPassword: "",
+    name: "",
+    email: "",
+    password: "",
     confirmPassword: ""
   });
+
+  // Load user data from API
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!authUser?.id) return;
+      
+      try {
+        setLoading(true);
+        const response = await API.users.getUser(authUser.id);
+        
+        if (response.success && response.data) {
+          const userData = response.data;
+          setUser(userData);
+          setEditForm({
+            name: userData.name || "",
+            email: userData.email || "",
+            password: "",
+            confirmPassword: ""
+          });
+        } else {
+          setMessage({ type: 'error', text: 'Failed to load profile data' });
+        }
+      } catch (err: any) {
+        console.error('Failed to load profile:', err);
+        setMessage({ type: 'error', text: err?.message || 'Failed to load profile data' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, [authUser?.id]);
 
   // Auto-hide messages after 5 seconds
   useEffect(() => {
@@ -61,71 +65,63 @@ export default function ProfilePage() {
     }
   }, [message]);
 
-  const handleSaveProfile = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!user?.id) return;
+    
     setIsLoading(true);
     setMessage(null);
     
     try {
-      // In a real app, you would call the API here
-      // const response = await API.users.updateProfile(editForm);
+      // Validate password if provided
+      if (editForm.password) {
+        if (editForm.password !== editForm.confirmPassword) {
+          setMessage({ type: 'error', text: 'Passwords do not match!' });
+          setIsLoading(false);
+          return;
+        }
+        if (editForm.password.length < 6) {
+          setMessage({ type: 'error', text: 'Password must be at least 6 characters!' });
+          setIsLoading(false);
+          return;
+        }
+      }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      setUser({
-        ...user,
+      // Only update basic profile fields, not location, service, status, role
+      const updateData: any = {
         name: editForm.name,
-        email: editForm.email,
-        nij: editForm.nij,
-        phone: editForm.phone,
-        address: editForm.address
-      });
+        email: editForm.email
+      };
       
-      setIsEditing(false);
-      setMessage({ type: 'success', text: 'Profile updated successfully!' });
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to update profile. Please try again.' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setMessage(null);
-    
-    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-      setMessage({ type: 'error', text: 'New passwords do not match!' });
-      return;
-    }
-    if (passwordForm.newPassword.length < 6) {
-      setMessage({ type: 'error', text: 'Password must be at least 6 characters!' });
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      // In a real app, you would call the API here
-      // const response = await API.auth.changePassword({
-      //   currentPassword: passwordForm.currentPassword,
-      //   newPassword: passwordForm.newPassword
-      // });
+      // Add password if provided
+      if (editForm.password.trim()) {
+        updateData.password = editForm.password;
+      }
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await API.users.updateUser(user.id, updateData);
       
-      // Reset form
-      setPasswordForm({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: ""
-      });
-      
-      setMessage({ type: 'success', text: 'Password changed successfully!' });
-    } catch (error) {
-      setMessage({ type: 'error', text: 'Failed to change password. Please check your current password and try again.' });
+      if (response.success) {
+        setUser({
+          ...user,
+          name: editForm.name,
+          email: editForm.email
+        });
+        
+        // Reset password fields
+        setEditForm({
+          ...editForm,
+          password: "",
+          confirmPassword: ""
+        });
+        
+        setIsEditing(false);
+        setMessage({ type: 'success', text: 'Profile updated successfully!' });
+      } else {
+        setMessage({ type: 'error', text: response.message || 'Failed to update profile' });
+      }
+    } catch (err: any) {
+      console.error('Failed to update profile:', err);
+      setMessage({ type: 'error', text: err?.message || 'Failed to update profile' });
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +144,22 @@ export default function ProfilePage() {
       minute: '2-digit'
     });
   };
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center min-h-96">
+        <div className="text-lg">Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center min-h-96">
+        <div className="text-red-600">Failed to load profile data</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -207,37 +219,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="mb-8">
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            <button
-              onClick={() => setActiveTab('profile')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'profile'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              📝 Profile Information
-            </button>
-            <button
-              onClick={() => setActiveTab('security')}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'security'
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-            >
-              🔒 Security
-            </button>
-          </nav>
-        </div>
-      </div>
-
-      {/* Profile Information Tab */}
-      {activeTab === 'profile' && (
-        <div className="bg-white rounded-lg shadow-md p-6">
+      {/* Profile Information */}
+      <div className="bg-white rounded-lg shadow-md p-6">
           <div className="flex justify-between items-center mb-6">
             <h3 className="text-xl font-semibold text-gray-900">Profile Information</h3>
             <button
@@ -246,9 +229,8 @@ export default function ProfilePage() {
                   setEditForm({
                     name: user.name,
                     email: user.email,
-                    nij: user.nij,
-                    phone: user.phone,
-                    address: user.address
+                    password: "",
+                    confirmPassword: ""
                   });
                 }
                 setIsEditing(!isEditing);
@@ -264,67 +246,62 @@ export default function ProfilePage() {
           </div>
 
           {isEditing ? (
-            <form onSubmit={handleSaveProfile} className="space-y-4">
+            <form onSubmit={handleSave} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Label htmlFor="name">
                     Full Name
-                  </label>
-                  <TextField
+                  </Label>
+                  <Input
+                    id="name"
                     value={editForm.name}
-                    onChange={(value) => setEditForm({...editForm, name: value})}
+                    onChange={(e) => setEditForm({...editForm, name: e.target.value})}
                     placeholder="Enter your full name"
+                    disabled={isLoading}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Label htmlFor="email">
                     Email Address
-                  </label>
-                  <TextField
+                  </Label>
+                  <Input
+                    id="email"
                     type="email"
                     value={editForm.email}
-                    onChange={(value) => setEditForm({...editForm, email: value})}
+                    onChange={(e) => setEditForm({...editForm, email: e.target.value})}
                     placeholder="Enter your email address"
+                    disabled={isLoading}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    NIJ (Nomor Induk Jemaat)
-                  </label>
-                  <input
-                    type="text"
-                    value={editForm.nij}
-                    onChange={(e) => setEditForm({...editForm, nij: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
+                  <Label htmlFor="password">
+                    New Password (leave blank to keep current)
+                  </Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={editForm.password}
+                    onChange={(e) => setEditForm({...editForm, password: e.target.value})}
+                    placeholder="Enter new password"
+                    disabled={isLoading}
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Phone Number
-                  </label>
-                  <input
-                    type="tel"
-                    value={editForm.phone}
-                    onChange={(e) => setEditForm({...editForm, phone: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  <Label htmlFor="confirmPassword">
+                    Confirm New Password
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type="password"
+                    value={editForm.confirmPassword}
+                    onChange={(e) => setEditForm({...editForm, confirmPassword: e.target.value})}
+                    placeholder="Confirm new password"
+                    disabled={isLoading}
                   />
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address
-                </label>
-                <textarea
-                  value={editForm.address}
-                  onChange={(e) => setEditForm({...editForm, address: e.target.value})}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">
@@ -357,115 +334,42 @@ export default function ProfilePage() {
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600">NIJ (Nomor Induk Jemaat)</label>
-                  <p className="text-lg text-gray-900">{user.nij}</p>
-                </div>
-                
-                <div>
                   <label className="block text-sm font-medium text-gray-600">Role</label>
                   <p className="text-lg text-gray-900 capitalize">
-                    {user.role === 'superadmin' ? '👑 Superadmin' : '🛡️ Admin'}
+                    {user.role === 'superadmin' ? '👑 Superadmin' : user.role === 'admin' ? '🛡️ Admin' : '👤 User'}
                   </p>
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-600">Phone Number</label>
-                  <p className="text-lg text-gray-900">{user.phone}</p>
+                  <label className="block text-sm font-medium text-gray-600">Status</label>
+                  <p className="text-lg text-gray-900">
+                    {user.isActive ? '✅ Active' : '❌ Inactive'}
+                  </p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600">Location</label>
+                  <p className="text-lg text-gray-900">{user.location?.value || 'Not set'}</p>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600">Service</label>
+                  <p className="text-lg text-gray-900">{user.service?.value || 'Not set'}</p>
                 </div>
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-600">Member Since</label>
                   <p className="text-lg text-gray-900">{formatDate(user.createdAt)}</p>
                 </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-600">Address</label>
-                <p className="text-lg text-gray-900">{user.address}</p>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-600">Last Login</label>
-                <p className="text-lg text-gray-900">{formatDateTime(user.lastLogin)}</p>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-600">Last Updated</label>
+                  <p className="text-lg text-gray-900">{user.updatedAt ? formatDateTime(user.updatedAt) : 'Never'}</p>
+                </div>
               </div>
             </div>
           )}
         </div>
-      )}
-
-      {/* Security Tab */}
-      {activeTab === 'security' && (
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <h3 className="text-xl font-semibold text-gray-900 mb-6">Security Settings</h3>
-          
-          {/* Change Password Form */}
-          <div className="border-b pb-6 mb-6">
-            <h4 className="text-lg font-medium text-gray-900 mb-4">Change Password</h4>
-            
-            <form onSubmit={handlePasswordChange} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  value={passwordForm.currentPassword}
-                  onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordForm.newPassword}
-                    onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    minLength={6}
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Minimum 6 characters</p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirm New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={passwordForm.confirmPassword}
-                    onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    minLength={6}
-                    required
-                  />
-                </div>
-              </div>
-              
-              <div className="flex justify-end">
-                <button
-                  type="submit"
-                  disabled={isLoading}
-                  className="bg-blue-600 text-white px-6 py-2 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                >
-                  {isLoading && (
-                    <svg className="animate-spin -ml-1 mr-3 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  {isLoading ? 'Updating...' : 'Update Password'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

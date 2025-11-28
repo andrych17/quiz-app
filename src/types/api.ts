@@ -88,14 +88,32 @@ export interface Quiz {
   token: string;
   serviceType?: string;
   quizType?: 'scheduled' | 'manual';
+  locationKey?: string;
+  location?: {
+    id: number;
+    key: string;
+    value: string;
+  };
+  serviceKey?: string;
+  service?: {
+    id: number;
+    key: string;
+    value: string;
+  };
   isPublished: boolean;
+  isActive?: boolean;
   passingScore?: number;
   questionsPerPage?: number;
   durationMinutes?: number;
   startDateTime?: string;
   endDateTime?: string;
+  quizLink?: string;
+  normalUrl?: string;
+  shortUrl?: string;
+  createdBy?: string;
   createdAt: string;
   updatedAt?: string;
+  updatedBy?: string;
   images?: QuizImage[];
   scoringTemplates?: QuizScoring[];
   questions?: Question[];
@@ -181,7 +199,12 @@ export interface Config {
   key: string;
   value: string;
   description?: string;
+  order?: number;
+  isActive: boolean;
+  createdBy?: string;
+  updatedBy?: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 // API Error class

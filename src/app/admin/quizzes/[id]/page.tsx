@@ -3,732 +3,1713 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { API } from "@/lib/api-client";
-import { useAuth } from "@/contexts/AuthContext";
-import type { Quiz, Question } from "@/types/api";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from "@/components/ui/dialog";
+import { CheckCircle, XCircle, Plus, Trash2, Edit2, GripVertical, ChevronUp, ChevronDown, Image as ImageIcon, Copy } from "lucide-react";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 
-export default function AdminQuizManagementPage() {
-  const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [selectedQuiz, setSelectedQuiz] = useState<Quiz | null>(null);
-  const [isCreateMode, setIsCreateMode] = useState(false);
-  const [isQuestionMode, setIsQuestionMode] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface PageProps {
+  params: Promise<{ id: string }>;
+}
+
+type QuestionType = 'multiple_choice' | 'true_false' | 'essay';
+
+interface Question {
+  id?: number;
+  questionText: string;
+  questionType: QuestionType;
+  imageUrl?: string;
+  options: string[];
+  correctAnswers: string[];
+  points: number;
+  order: number;
+  isRequired: boolean;
+}
+
+export default function QuizDetailPage({ params }: PageProps) {
   const router = useRouter();
-  const { user, isSuperadmin, isAdmin } = useAuth();
+  
+  const [quizId, setQuizId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDialog, setShowDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [dialogType, setDialogType] = useState<'success' | 'error'>('success');
+  const [dialogMessage, setDialogMessage] = useState('');
+  const [activeTab, setActiveTab] = useState<'general' | 'questions' | 'scoring'>('general');
 
-  // Form state for create/edit quiz
-  const [quizForm, setQuizForm] = useState({
+  // Options for dropdowns
+  const [locationOptions, setLocationOptions] = useState<Array<{value: string, label: string}>>([]);
+  const [serviceOptions, setServiceOptions] = useState<Array<{value: string, label: string}>>([]);
+
+  const isCreateMode = quizId === "new";
+
+  // Form state - General Info
+  const [formData, setFormData] = useState({
     title: '',
     description: '',
-    quizType: 'assessment' as 'assessment' | 'survey' | 'certification',
-    serviceType: 'general',
-    locationId: null as number | null,
-    timeLimit: 30,
-    passingScore: 70,
-    maxAttempts: 1,
+    locationKey: '',
+    serviceKey: '',
+    passingScore: 60,
+    questionsPerPage: 1,
+    durationMinutes: 30,
     isPublished: false,
-    isActive: true
   });
 
-  // Questions for selected quiz
+  // Questions state
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [questionForm, setQuestionForm] = useState({
-    text: '',
-    type: 'multiple_choice' as 'multiple_choice' | 'true_false' | 'short_answer' | 'essay',
-    options: ['', '', '', ''],
-    correctAnswer: '',
-    points: 10,
-    imageUrl: ''
+  const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [showQuestionDialog, setShowQuestionDialog] = useState(false);
+  const [questionError, setQuestionError] = useState<string>('');
+
+  // Scoring templates state - Simple mapping of correct answers to scores
+  const [scoringMap, setScoringMap] = useState<Array<{correctAnswers: number, score: number}>>([]);
+  const [showScoringDialog, setShowScoringDialog] = useState(false);
+  const [editingScoring, setEditingScoring] = useState<{correctAnswers: number, score: number} | null>(null);
+
+  // Quiz token/link state
+  const [quizToken, setQuizToken] = useState<string>('');
+
+  // Metadata state
+  const [metadata, setMetadata] = useState<{
+    createdAt?: string;
+    updatedAt?: string;
+    createdBy?: string;
+    updatedBy?: string;
+  }>({});
+
+  // Track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+
+  // Copy template state
+  const [showCopyDialog, setShowCopyDialog] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [copyFormData, setCopyFormData] = useState({
+    title: '',
+    locationKey: '',
+    serviceKey: ''
   });
+
+  // Warn user about unsaved changes
+  useUnsavedChanges(hasUnsavedChanges);
 
   useEffect(() => {
-    if (!isAdmin && !isSuperadmin) {
-      setError("Access denied. Admin or Superadmin role required.");
-      setLoading(false);
-      return;
-    }
-    loadQuizzes();
-  }, [isAdmin, isSuperadmin]);
+    const getParams = async () => {
+      const resolvedParams = await params;
+      setQuizId(resolvedParams.id);
+    };
+    getParams();
+  }, [params]);
 
-  const loadQuizzes = async () => {
+  // Warn user about unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!quizId) return;
+    
+    const loadData = async () => {
+      if (!isCreateMode) {
+        await loadQuizData();
+      } else {
+        await loadOptions();
+      }
+    };
+    
+    loadData();
+  }, [quizId, isCreateMode]);
+
+  const loadOptions = async () => {
     try {
       setLoading(true);
-      setError(null);
 
-      const response = await API.quizzes.getQuizzes();
+      const [locationRes, serviceRes] = await Promise.all([
+        API.config.getConfigsByGroup('location'),
+        API.config.getConfigsByGroup('service')
+      ]);
 
-      if (response.success) {
-        const quizData = (response.data as any)?.items || response.data || [];
-        setQuizzes(Array.isArray(quizData) ? quizData : []);
+      if (locationRes?.success) {
+        const locationData = locationRes.data || [];
+        const locationOpts = Array.isArray(locationData) ? locationData.map((config: { key: string, value: string }) => ({
+          value: config.key,
+          label: config.value
+        })) : [];
+        setLocationOptions(locationOpts);
+      }
+
+      if (serviceRes?.success) {
+        const serviceData = serviceRes.data || [];
+        const serviceOpts = Array.isArray(serviceData) ? serviceData.map((config: { key: string, value: string }) => ({
+          value: config.key,
+          label: config.value
+        })) : [];
+        setServiceOptions(serviceOpts);
       }
 
     } catch (err: any) {
-      console.error('Failed to load quizzes:', err);
-      setError(err?.message || 'Failed to load quizzes');
+      console.error('Failed to load options:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadQuestions = async (quizId: number) => {
+  const loadQuizData = async () => {
     try {
-      const response = await API.questions.getQuestions();
-      
-      if (response.success) {
-        const questionData = (response.data as any)?.items || response.data || [];
-        // Filter questions by quizId
-        const filteredQuestions = Array.isArray(questionData) 
-          ? questionData.filter((q: any) => q.quizId === quizId)
-          : [];
-        setQuestions(filteredQuestions);
+      setLoading(true);
+
+      const [quizRes, locationRes, serviceRes] = await Promise.all([
+        API.quizzes.getQuiz(Number(quizId)),
+        API.config.getConfigsByGroup('location'),
+        API.config.getConfigsByGroup('service')
+      ]);
+
+      if (locationRes?.success) {
+        const locationData = locationRes.data || [];
+        const locationOpts = Array.isArray(locationData) ? locationData.map((config: { key: string, value: string }) => ({
+          value: config.key,
+          label: config.value
+        })) : [];
+        setLocationOptions(locationOpts);
       }
+
+      if (serviceRes?.success) {
+        const serviceData = serviceRes.data || [];
+        const serviceOpts = Array.isArray(serviceData) ? serviceData.map((config: { key: string, value: string }) => ({
+          value: config.key,
+          label: config.value
+        })) : [];
+        setServiceOptions(serviceOpts);
+      }
+
+      if (quizRes.success && quizRes.data) {
+        const quizData = quizRes.data;
+        
+        console.log('=== LOAD QUIZ DATA ===');
+        console.log('Raw quiz data:', quizData);
+        console.log('Questions from backend:', quizData.questions);
+        console.log('=====================');
+        
+        setFormData({
+          title: quizData.title || '',
+          description: quizData.description || '',
+          locationKey: quizData.locationKey || '',
+          serviceKey: quizData.serviceKey || '',
+          passingScore: quizData.passingScore || 60,
+          questionsPerPage: quizData.questionsPerPage || 1,
+          durationMinutes: quizData.durationMinutes || 30,
+          isPublished: quizData.isPublished === true, // Explicitly check for true
+        });
+
+        // Set quiz token for link generation
+        // Use shortUrl if available, otherwise use normalUrl or token
+        setQuizToken(quizData.shortUrl || quizData.normalUrl || quizData.token || quizData.id?.toString() || '');
+
+        // Set metadata
+        setMetadata({
+          createdAt: quizData.createdAt,
+          updatedAt: quizData.updatedAt,
+          createdBy: quizData.createdBy,
+          updatedBy: quizData.updatedBy
+        });
+
+        // Transform questions to local format
+        const transformedQuestions: Question[] = (quizData.questions || []).map((q: any, index: number) => {
+          // Convert questionType from backend format (multiple-choice) to frontend format (multiple_choice)
+          const frontendQuestionType = q.questionType ? q.questionType.replace(/-/g, '_') : 'multiple_choice';
+          
+          return {
+            id: q.id,
+            questionText: q.questionText || '',
+            questionType: frontendQuestionType as QuestionType,
+            imageUrl: q.imageUrl || '',
+            options: q.options || [],
+            correctAnswers: q.correctAnswers || [],
+            points: q.points || 1,
+            order: q.order !== undefined ? q.order : index,
+            isRequired: q.isRequired !== undefined ? q.isRequired : true,
+          };
+        });
+        
+        console.log('Transformed questions:', transformedQuestions);
+        console.log('=====================');
+        
+        setQuestions(transformedQuestions);
+        
+        // Load scoring map - convert from backend format if needed
+        const scoringData = quizData.scoringTemplates || [];
+        const scoreMap = scoringData.map((s: any, index: number) => ({
+          correctAnswers: index,
+          score: s.maxScore || 0
+        }));
+        setScoringMap(scoreMap);
+      }
+
     } catch (err: any) {
-      console.error('Failed to load questions:', err);
-      setError(err?.message || 'Failed to load questions');
+      console.error('Failed to load quiz data:', err);
+      setDialogType('error');
+      setDialogMessage(err?.message || 'Failed to load quiz data');
+      setShowDialog(true);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCreateQuiz = async () => {
+  const handleSave = async () => {
     try {
-      setError(null);
+      setSaving(true);
 
-      if (!quizForm.title || !quizForm.description) {
-        setError('Title and description are required');
+      // Validate required fields
+      if (!formData.title.trim()) {
+        setDialogType('error');
+        setDialogMessage('Title is required');
+        setShowDialog(true);
         return;
       }
 
-      const createData = {
-        title: quizForm.title,
-        description: quizForm.description,
-        quizType: quizForm.quizType,
-        serviceType: quizForm.serviceType !== 'general' ? quizForm.serviceType : undefined,
-        locationId: quizForm.locationId,
-        timeLimit: quizForm.timeLimit,
-        passingScore: quizForm.passingScore,
-        maxAttempts: quizForm.maxAttempts,
-        isPublished: quizForm.isPublished,
-        isActive: quizForm.isActive
+      const quizData: any = {
+        title: formData.title.trim(),
+        description: formData.description.trim(),
+        locationKey: formData.locationKey || undefined,
+        serviceKey: formData.serviceKey || undefined,
+        passingScore: formData.passingScore,
+        questionsPerPage: formData.questionsPerPage,
+        durationMinutes: formData.durationMinutes,
       };
 
-      const response = await API.quizzes.createQuiz(createData);
+      // Add scoring map as templates if any
+      if (scoringMap.length > 0) {
+        quizData.scoringTemplates = scoringMap.map(s => ({
+          grade: `${s.correctAnswers} Benar`,
+          maxScore: s.score,
+          minScore: s.score,
+        }));
+      }
 
-      if (response.success) {
-        alert('Quiz created successfully');
-        setIsCreateMode(false);
-        setQuizForm({
-          title: '',
-          description: '',
-          quizType: 'assessment',
-          serviceType: 'general',
-          locationId: null,
-          timeLimit: 30,
-          passingScore: 70,
-          maxAttempts: 1,
-          isPublished: false,
-          isActive: true
+      // Add questions to quiz data
+      if (questions.length > 0) {
+        quizData.questions = questions.map((q, index) => {
+          // Convert questionType format: multiple_choice -> multiple-choice
+          let apiQuestionType = q.questionType.replace(/_/g, '-');
+          
+          // Backend expects correctAnswers (plural) as array
+          // For essay questions, use ['essay'] as placeholder
+          const correctAnswers = q.questionType === 'essay' 
+            ? ['essay'] 
+            : (q.correctAnswers.length > 0 ? q.correctAnswers : ['']);
+          
+          return {
+            questionText: q.questionText,
+            questionType: apiQuestionType,
+            options: q.options,
+            correctAnswers: correctAnswers,
+            order: index,
+          };
         });
-        await loadQuizzes();
+      }
+
+      let result;
+      if (isCreateMode) {
+        result = await API.quizzes.createQuiz(quizData);
+      } else {
+        result = await API.quizzes.updateQuiz(Number(quizId), quizData);
+      }
+
+      if (result.success) {
+        const successMessage = isCreateMode 
+          ? 'Quiz created successfully!' 
+          : 'Quiz updated successfully!';
+        
+        // Reset unsaved changes flag
+        setHasUnsavedChanges(false);
+        
+        setDialogType('success');
+        setDialogMessage(successMessage);
+        setShowDialog(true);
+      } else {
+        setDialogType('error');
+        setDialogMessage(result.message || 'Failed to save quiz');
+        setShowDialog(true);
       }
     } catch (err: any) {
-      console.error('Failed to create quiz:', err);
-      setError(err?.message || 'Failed to create quiz');
+      console.error('Failed to save quiz:', err);
+      setDialogType('error');
+      setDialogMessage(err?.message || 'Failed to save quiz');
+      setShowDialog(true);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleUpdateQuiz = async (quizId: number, updateData: any) => {
-    try {
-      setError(null);
-
-      const response = await API.quizzes.updateQuiz(quizId, updateData);
-
-      if (response.success) {
-        alert('Quiz updated successfully');
-        await loadQuizzes();
+  const handleDialogClose = () => {
+    setShowDialog(false);
+    if (dialogType === 'success') {
+      if (isCreateMode) {
+        router.push('/admin/quizzes');
       }
-    } catch (err: any) {
-      console.error('Failed to update quiz:', err);
-      setError(err?.message || 'Failed to update quiz');
     }
   };
 
-  const handleDeleteQuiz = async (quizId: number) => {
-    if (!confirm('Are you sure you want to delete this quiz?')) return;
-
+  const handleDelete = async () => {
     try {
-      setError(null);
-
-      const response = await API.quizzes.deleteQuiz(quizId);
-
-      if (response.success) {
-        alert('Quiz deleted successfully');
-        await loadQuizzes();
+      setDeleting(true);
+      const result = await API.quizzes.deleteQuiz(Number(quizId));
+      
+      if (result.success) {
+        setShowDeleteConfirm(false);
+        setDialogType('success');
+        setDialogMessage('Quiz berhasil dihapus!');
+        setShowDialog(true);
+        
+        // Redirect after showing success
+        setTimeout(() => {
+          router.push('/admin/quizzes');
+        }, 1500);
+      } else {
+        setShowDeleteConfirm(false);
+        setDialogType('error');
+        setDialogMessage(result.message || 'Gagal menghapus quiz');
+        setShowDialog(true);
       }
     } catch (err: any) {
       console.error('Failed to delete quiz:', err);
-      setError(err?.message || 'Failed to delete quiz');
+      setShowDeleteConfirm(false);
+      setDialogType('error');
+      setDialogMessage(err?.message || 'Gagal menghapus quiz');
+      setShowDialog(true);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  const handleCreateQuestion = async (quizId: number) => {
-    try {
-      setError(null);
+  // Copy as Template Handler
+  const handleCopyAsTemplate = () => {
+    // Pre-fill with modified title
+    setCopyFormData({
+      title: formData.title + ' (Copy)',
+      locationKey: formData.locationKey,
+      serviceKey: formData.serviceKey
+    });
+    setShowCopyDialog(true);
+  };
 
-      if (!questionForm.text) {
-        setError('Question text is required');
+  const handleSubmitCopy = async () => {
+    try {
+      setCopying(true);
+      
+      // Validate
+      if (!copyFormData.title.trim()) {
+        setDialogType('error');
+        setDialogMessage('Nama quiz harus diisi');
+        setShowDialog(true);
         return;
       }
 
-      const createData = {
-        question: questionForm.text,
-        type: questionForm.type,
-        options: questionForm.type === 'multiple_choice' 
-          ? questionForm.options.filter(opt => opt.trim()) 
-          : undefined,
-        correctAnswer: questionForm.correctAnswer,
-        points: questionForm.points,
-        imageUrl: questionForm.imageUrl || undefined,
-        quizId
+      // Prepare quiz data with new values
+      const quizData: any = {
+        title: copyFormData.title.trim(),
+        description: formData.description,
+        locationKey: copyFormData.locationKey || undefined,
+        serviceKey: copyFormData.serviceKey || undefined,
+        passingScore: formData.passingScore,
+        questionsPerPage: formData.questionsPerPage,
+        durationMinutes: formData.durationMinutes,
       };
 
-      const response = await API.questions.createQuestion(createData);
-
-      if (response.success) {
-        alert('Question added successfully');
-        setQuestionForm({
-          text: '',
-          type: 'multiple_choice',
-          options: ['', '', '', ''],
-          correctAnswer: '',
-          points: 10,
-          imageUrl: ''
+      // Copy questions
+      if (questions.length > 0) {
+        quizData.questions = questions.map((q, index) => {
+          let apiQuestionType = q.questionType.replace(/_/g, '-');
+          // Backend expects correctAnswers (plural) as array
+          const correctAnswers = q.questionType === 'essay'
+            ? ['essay']
+            : (q.correctAnswers.length > 0 ? q.correctAnswers : ['']);
+          
+          return {
+            questionText: q.questionText,
+            questionType: apiQuestionType,
+            options: q.options,
+            correctAnswers: correctAnswers,
+            order: index,
+          };
         });
-        await loadQuestions(quizId);
+      }
+
+      // Copy scoring map
+      if (scoringMap.length > 0) {
+        quizData.scoringTemplates = scoringMap.map(s => ({
+          grade: `${s.correctAnswers} Benar`,
+          maxScore: s.score,
+          minScore: s.score,
+        }));
+      }
+
+      // Create new quiz
+      const result = await API.quizzes.createQuiz(quizData);
+
+      if (result.success) {
+        setShowCopyDialog(false);
+        setDialogType('success');
+        setDialogMessage('Quiz berhasil di-copy sebagai template baru!');
+        setShowDialog(true);
+        
+        // Redirect to new quiz after delay
+        setTimeout(() => {
+          if (result.data?.id) {
+            router.push(`/admin/quizzes/${result.data.id}`);
+          } else {
+            router.push('/admin/quizzes');
+          }
+        }, 1500);
+      } else {
+        setDialogType('error');
+        setDialogMessage(result.message || 'Gagal meng-copy quiz');
+        setShowDialog(true);
       }
     } catch (err: any) {
-      console.error('Failed to create question:', err);
-      setError(err?.message || 'Failed to create question');
+      console.error('Failed to copy quiz:', err);
+      setDialogType('error');
+      setDialogMessage(err?.message || 'Gagal meng-copy quiz');
+      setShowDialog(true);
+    } finally {
+      setCopying(false);
     }
   };
 
-  const handleDeleteQuestion = async (questionId: number) => {
-    if (!confirm('Are you sure you want to delete this question?')) return;
-
-    try {
-      setError(null);
-
-      const response = await API.questions.deleteQuestion(questionId);
-
-      if (response.success) {
-        alert('Question deleted successfully');
-        if (selectedQuiz) {
-          await loadQuestions(selectedQuiz.id);
-        }
-      }
-    } catch (err: any) {
-      console.error('Failed to delete question:', err);
-      setError(err?.message || 'Failed to delete question');
-    }
+  // Question Management Functions
+  const handleAddQuestion = () => {
+    const newQuestion: Question = {
+      questionText: '',
+      questionType: 'multiple_choice',
+      imageUrl: '',
+      options: ['', '', '', ''],
+      correctAnswers: [],
+      points: 1,
+      order: questions.length,
+      isRequired: true,
+    };
+    setEditingQuestion(newQuestion);
+    setShowQuestionDialog(true);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading quiz data...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleEditQuestion = (question: Question, index: number) => {
+    setEditingQuestion({ 
+      ...question,
+      imageUrl: question.imageUrl || '',
+      // Store the original index to identify which question to update
+      _editIndex: index
+    } as any);
+    setShowQuestionDialog(true);
+  };
 
-  if (error) {
+  const handleDeleteQuestion = (index: number) => {
+    const newQuestions = questions.filter((_, i) => i !== index);
+    // Reorder questions
+    const reorderedQuestions = newQuestions.map((q, i) => ({ ...q, order: i }));
+    setQuestions(reorderedQuestions);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleMoveQuestion = (index: number, direction: 'up' | 'down') => {
+    const newQuestions = [...questions];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    
+    if (targetIndex < 0 || targetIndex >= newQuestions.length) return;
+    
+    // Swap questions
+    [newQuestions[index], newQuestions[targetIndex]] = [newQuestions[targetIndex], newQuestions[index]];
+    
+    // Update order
+    const reorderedQuestions = newQuestions.map((q, i) => ({ ...q, order: i }));
+    setQuestions(reorderedQuestions);
+    setHasUnsavedChanges(true);
+  };
+
+  const handleSaveQuestion = () => {
+    if (!editingQuestion) return;
+
+    // Validate
+    if (!editingQuestion.questionText.trim()) {
+      setQuestionError('Teks pertanyaan harus diisi');
+      return;
+    }
+
+    if (editingQuestion.questionType === 'multiple_choice' && editingQuestion.options.length < 2) {
+      setQuestionError('Pertanyaan pilihan ganda minimal harus memiliki 2 pilihan');
+      return;
+    }
+
+    // Essay questions don't need correct answers
+    if (editingQuestion.questionType !== 'essay' && editingQuestion.correctAnswers.length === 0) {
+      setQuestionError('Pilih minimal satu jawaban yang benar');
+      return;
+    }
+
+    const editIndex = (editingQuestion as any)._editIndex;
+    
+    if (editIndex !== undefined && editIndex >= 0) {
+      // Update existing question by index
+      const updatedQuestions = [...questions];
+      const { _editIndex, ...cleanQuestion } = editingQuestion as any;
+      updatedQuestions[editIndex] = cleanQuestion;
+      setQuestions(updatedQuestions);
+    } else {
+      // Add new question
+      const { _editIndex, ...cleanQuestion } = editingQuestion as any;
+      const newQuestion = {
+        ...cleanQuestion,
+        order: questions.length,
+      };
+      setQuestions([...questions, newQuestion]);
+    }
+
+    setHasUnsavedChanges(true);
+    setShowQuestionDialog(false);
+    setEditingQuestion(null);
+    setQuestionError('');
+  };
+
+  const handleQuestionDialogClose = () => {
+    setShowQuestionDialog(false);
+    setEditingQuestion(null);
+    setQuestionError('');
+  };
+
+  const updateEditingQuestionOption = (index: number, value: string) => {
+    if (!editingQuestion) return;
+    const newOptions = [...editingQuestion.options];
+    newOptions[index] = value;
+    setEditingQuestion({ ...editingQuestion, options: newOptions });
+    // Clear error when user makes changes
+    if (questionError) setQuestionError('');
+  };
+
+  const addOptionToEditingQuestion = () => {
+    if (!editingQuestion) return;
+    setEditingQuestion({
+      ...editingQuestion,
+      options: [...editingQuestion.options, ''],
+    });
+  };
+
+  const removeOptionFromEditingQuestion = (index: number) => {
+    if (!editingQuestion || editingQuestion.options.length <= 2) return;
+    const newOptions = editingQuestion.options.filter((_, i) => i !== index);
+    // Remove from correct answers if it was selected
+    const newCorrectAnswers = editingQuestion.correctAnswers.filter(a => a !== editingQuestion.options[index]);
+    setEditingQuestion({
+      ...editingQuestion,
+      options: newOptions,
+      correctAnswers: newCorrectAnswers,
+    });
+  };
+
+  const toggleCorrectAnswer = (option: string) => {
+    if (!editingQuestion) return;
+    
+    // Don't allow selecting empty options
+    if (!option || option.trim() === '') {
+      return;
+    }
+    
+    const isSelected = editingQuestion.correctAnswers.includes(option);
+    const newCorrectAnswers = isSelected
+      ? editingQuestion.correctAnswers.filter(a => a !== option)
+      : [...editingQuestion.correctAnswers, option];
+    setEditingQuestion({
+      ...editingQuestion,
+      correctAnswers: newCorrectAnswers,
+    });
+    // Clear error when user makes changes
+    if (questionError) setQuestionError('');
+  };
+
+  // Scoring Management Functions
+  const handleSaveScoring = () => {
+    if (!editingScoring) return;
+
+    // Validate
+    if (editingScoring.score < 0) {
+      alert('Score tidak boleh negatif');
+      return;
+    }
+
+    // Check if correctAnswers already exists
+    const existingIndex = scoringMap.findIndex(s => s.correctAnswers === editingScoring.correctAnswers);
+    
+    if (existingIndex >= 0) {
+      // Update existing
+      const newMap = [...scoringMap];
+      newMap[existingIndex] = editingScoring;
+      setScoringMap(newMap);
+    } else {
+      // Add new
+      setScoringMap([...scoringMap, editingScoring]);
+    }
+
+    setHasUnsavedChanges(true);
+    setShowScoringDialog(false);
+    setEditingScoring(null);
+  };
+
+  const handleGenerateDefaultScoring = () => {
+    // Generate default scoring based on example data provided
+    const defaultScoring = [
+      {correctAnswers: 0, score: 73}, {correctAnswers: 1, score: 73}, {correctAnswers: 2, score: 73},
+      {correctAnswers: 3, score: 73}, {correctAnswers: 4, score: 73}, {correctAnswers: 5, score: 73},
+      {correctAnswers: 6, score: 73}, {correctAnswers: 7, score: 73}, {correctAnswers: 8, score: 77},
+      {correctAnswers: 9, score: 79}, {correctAnswers: 10, score: 84}, {correctAnswers: 11, score: 84},
+      {correctAnswers: 12, score: 88}, {correctAnswers: 13, score: 88}, {correctAnswers: 14, score: 92},
+      {correctAnswers: 15, score: 92}, {correctAnswers: 16, score: 94}, {correctAnswers: 17, score: 94},
+      {correctAnswers: 18, score: 98}, {correctAnswers: 19, score: 98}, {correctAnswers: 20, score: 101},
+      {correctAnswers: 21, score: 101}, {correctAnswers: 22, score: 104}, {correctAnswers: 23, score: 104},
+      {correctAnswers: 24, score: 108}, {correctAnswers: 25, score: 108}, {correctAnswers: 26, score: 112},
+      {correctAnswers: 27, score: 112}, {correctAnswers: 28, score: 116}, {correctAnswers: 29, score: 116},
+      {correctAnswers: 30, score: 120}, {correctAnswers: 31, score: 120}, {correctAnswers: 32, score: 123},
+      {correctAnswers: 33, score: 125}, {correctAnswers: 34, score: 132}, {correctAnswers: 35, score: 139},
+    ];
+    setScoringMap(defaultScoring);
+    setHasUnsavedChanges(true);
+    alert('Default scoring template berhasil di-generate untuk 0-35 jawaban benar!');
+  };
+
+  if (!quizId || loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-center text-red-600">
-          <p className="text-xl mb-4">⚠️ {error}</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Retry
-          </button>
+      <div className="p-6">
+        <div className="flex justify-center items-center h-64">
+          <div className="text-gray-500">Loading...</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">📝 Quiz Management</h1>
-          <p className="text-gray-600 mt-2">Create and manage quizzes with location and service restrictions</p>
-          <div className="mt-2">
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-              isSuperadmin ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-            }`}>
-              {isSuperadmin ? 'Superadmin Access' : 'Admin Access'}
-            </span>
-          </div>
-        </div>
+    <div className="p-6">
+      <div className="mb-6">
         <button
-          onClick={() => setIsCreateMode(true)}
-          className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+          onClick={() => {
+            if (hasUnsavedChanges) {
+              if (confirm('Anda memiliki perubahan yang belum disimpan. Yakin ingin meninggalkan halaman?')) {
+                router.push("/admin/quizzes");
+              }
+            } else {
+              router.push("/admin/quizzes");
+            }
+          }}
+          className="text-blue-600 hover:text-blue-800 mb-4"
         >
-          ➕ Create New Quiz
+          ← Back to Quizzes
         </button>
-      </div>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">
+            {isCreateMode ? "Create Quiz" : "Edit Quiz"}
+          </h1>
+          
+          {!isCreateMode && (
+            <div className="flex items-center gap-3">
+              {/* Generate Link button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const quizUrl = `${window.location.origin}/quiz/${quizToken || quizId}`;
+                  navigator.clipboard.writeText(quizUrl);
+                  setDialogType('success');
+                  setDialogMessage('Quiz link copied to clipboard!');
+                  setShowDialog(true);
+                }}
+                className="border-blue-600 text-blue-700 hover:bg-blue-50"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Generate Link
+              </Button>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-blue-100 rounded-full">
-              <span className="text-blue-600 text-2xl">📝</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Total Quizzes</h3>
-              <p className="text-2xl font-bold text-gray-900">{quizzes.length}</p>
-            </div>
-          </div>
-        </div>
+              {/* Publish/Unpublish button */}
+              <Button
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const newPublishStatus = !formData.isPublished;
+                    await handleSave();
+                    setFormData({ ...formData, isPublished: newPublishStatus });
+                    setDialogType('success');
+                    setDialogMessage(`Quiz ${newPublishStatus ? 'published' : 'unpublished'} successfully!`);
+                    setShowDialog(true);
+                  } catch (err) {
+                    setDialogType('error');
+                    setDialogMessage('Failed to update publish status');
+                    setShowDialog(true);
+                  }
+                }}
+                className={formData.isPublished 
+                  ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
+                  : "bg-green-600 hover:bg-green-700 text-white"
+                }
+              >
+                {formData.isPublished ? 'Unpublish' : 'Publish'}
+              </Button>
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-green-100 rounded-full">
-              <span className="text-green-600 text-2xl">✅</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Published</h3>
-              <p className="text-2xl font-bold text-gray-900">
-                {quizzes.filter(q => q.isPublished).length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-yellow-100 rounded-full">
-              <span className="text-yellow-600 text-2xl">📋</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Draft</h3>
-              <p className="text-2xl font-bold text-gray-900">
-                {quizzes.filter(q => !q.isPublished).length}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-3 bg-purple-100 rounded-full">
-              <span className="text-purple-600 text-2xl">❓</span>
-            </div>
-            <div className="ml-4">
-              <h3 className="text-sm font-medium text-gray-600">Total Questions</h3>
-              <p className="text-2xl font-bold text-gray-900">
-                {quizzes.reduce((sum, quiz) => sum + (quiz.questions?.length || 0), 0)}
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quizzes List */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">Your Quizzes</h2>
-        </div>
-        
-        <div className="p-6">
-          {quizzes.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-500">No quizzes found. Create your first quiz!</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {quizzes.map((quiz) => (
-                <div key={quiz.id} className="border rounded-lg p-4 hover:bg-gray-50">
-                  <div className="flex justify-between items-start">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{quiz.title}</h3>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          quiz.isPublished 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-yellow-100 text-yellow-800'
-                        }`}>
-                          {quiz.isPublished ? 'Published' : 'Draft'}
-                        </span>
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {quiz.quizType?.toUpperCase()}
-                        </span>
-                      </div>
-                      
-                      <p className="text-gray-600 mb-2">{quiz.description}</p>
-                      
-                      <div className="flex gap-4 text-sm text-gray-500 mb-2">
-                        <span>⏱️ {(quiz as any).timeLimit || 30} minutes</span>
-                        <span>📊 {(quiz as any).passingScore || 70}% passing</span>
-                        <span>🔄 {(quiz as any).maxAttempts || 1} attempts</span>
-                        <span>❓ {quiz.questions?.length || 0} questions</span>
-                      </div>
-
-                      {quiz.serviceType && (
-                        <div className="mb-2">
-                          <span className="inline-flex items-center px-2 py-1 bg-purple-100 text-purple-800 text-xs rounded-full">
-                            📍 Service: {quiz.serviceType}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedQuiz(quiz);
-                          setIsQuestionMode(true);
-                          loadQuestions(quiz.id);
-                        }}
-                        className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                      >
-                        📝 Questions ({quiz.questions?.length || 0})
-                      </button>
-                      
-                      <button
-                        onClick={() => router.push(`/admin/quizzes/${quiz.id}/edit`)}
-                        className="px-3 py-1 text-sm bg-yellow-600 text-white rounded hover:bg-yellow-700"
-                      >
-                        ✏️ Edit
-                      </button>
-                      
-                      <button
-                        onClick={() => handleDeleteQuiz(quiz.id)}
-                        className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-                      >
-                        🗑️ Delete
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+              {/* Copy as Template button */}
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleCopyAsTemplate}
+                disabled={copying}
+                className="border-purple-600 text-purple-700 hover:bg-purple-50"
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copy as Template
+              </Button>
             </div>
           )}
         </div>
       </div>
 
-      {/* Create Quiz Modal */}
-      {isCreateMode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Create New Quiz</h2>
-              <button
-                onClick={() => {
-                  setIsCreateMode(false);
-                  setQuizForm({
-                    title: '',
-                    description: '',
-                    quizType: 'assessment',
-                    serviceType: 'general',
-                    locationId: null,
-                    timeLimit: 30,
-                    passingScore: 70,
-                    maxAttempts: 1,
-                    isPublished: false,
-                    isActive: true
-                  });
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={(e) => { e.preventDefault(); handleCreateQuiz(); }} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
-                <input
-                  type="text"
-                  value={quizForm.title}
-                  onChange={(e) => setQuizForm({ ...quizForm, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description *</label>
-                <textarea
-                  value={quizForm.description}
-                  onChange={(e) => setQuizForm({ ...quizForm, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows={3}
-                  required
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Quiz Type</label>
-                  <select
-                    value={quizForm.quizType}
-                    onChange={(e) => setQuizForm({ ...quizForm, quizType: e.target.value as 'assessment' | 'survey' | 'certification' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="assessment">Assessment</option>
-                    <option value="survey">Survey</option>
-                    <option value="certification">Certification</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Service Type</label>
-                  <select
-                    value={quizForm.serviceType}
-                    onChange={(e) => setQuizForm({ ...quizForm, serviceType: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="general">General (All Services)</option>
-                    <option value="medical">Medical</option>
-                    <option value="dental">Dental</option>
-                    <option value="laboratory">Laboratory</option>
-                    <option value="pharmacy">Pharmacy</option>
-                    <option value="radiology">Radiology</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Time Limit (minutes)</label>
-                  <input
-                    type="number"
-                    value={quizForm.timeLimit}
-                    onChange={(e) => setQuizForm({ ...quizForm, timeLimit: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="1"
-                    max="180"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Passing Score (%)</label>
-                  <input
-                    type="number"
-                    value={quizForm.passingScore}
-                    onChange={(e) => setQuizForm({ ...quizForm, passingScore: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="0"
-                    max="100"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Max Attempts</label>
-                <input
-                  type="number"
-                  value={quizForm.maxAttempts}
-                  onChange={(e) => setQuizForm({ ...quizForm, maxAttempts: Number(e.target.value) })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  min="1"
-                  max="10"
-                />
-              </div>
-
-              <div className="flex items-center space-x-4">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={quizForm.isPublished}
-                    onChange={(e) => setQuizForm({ ...quizForm, isPublished: e.target.checked })}
-                    className="rounded"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Publish immediately</span>
-                </label>
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreateMode(false);
-                    setQuizForm({
-                      title: '',
-                      description: '',
-                      quizType: 'assessment',
-                      serviceType: 'general',
-                      locationId: null,
-                      timeLimit: 30,
-                      passingScore: 70,
-                      maxAttempts: 1,
-                      isPublished: false,
-                      isActive: true
-                    });
-                  }}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-md hover:bg-gray-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-                >
-                  Create Quiz
-                </button>
-              </div>
-            </form>
-          </div>
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
+            <button
+              onClick={() => setActiveTab('general')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'general'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              General Info
+            </button>
+            <button
+              onClick={() => setActiveTab('questions')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'questions'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Questions ({questions.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('scoring')}
+              className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'scoring'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Scoring ({scoringMap.length})
+            </button>
+          </nav>
         </div>
-      )}
+      </div>
 
-      {/* Questions Modal */}
-      {isQuestionMode && selectedQuiz && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold">Questions for: {selectedQuiz.title}</h2>
-              <button
-                onClick={() => {
-                  setIsQuestionMode(false);
-                  setSelectedQuiz(null);
-                  setQuestions([]);
-                }}
-                className="text-gray-500 hover:text-gray-700"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Add Question Form */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Add New Question</h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Question Text *</label>
-                  <textarea
-                    value={questionForm.text}
-                    onChange={(e) => setQuestionForm({ ...questionForm, text: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    rows={3}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Question Type</label>
-                  <select
-                    value={questionForm.type}
-                    onChange={(e) => setQuestionForm({ ...questionForm, type: e.target.value as 'multiple_choice' | 'true_false' | 'short_answer' | 'essay' })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="multiple_choice">Multiple Choice</option>
-                    <option value="true_false">True/False</option>
-                    <option value="short_answer">Short Answer</option>
-                    <option value="essay">Essay</option>
-                  </select>
-                </div>
-
-                {questionForm.type === 'multiple_choice' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Options</label>
-                    {questionForm.options.map((option, index) => (
-                      <input
-                        key={index}
-                        type="text"
-                        value={option}
-                        onChange={(e) => {
-                          const newOptions = [...questionForm.options];
-                          newOptions[index] = e.target.value;
-                          setQuestionForm({ ...questionForm, options: newOptions });
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mb-2"
-                        placeholder={`Option ${index + 1}`}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Correct Answer</label>
-                  <input
-                    type="text"
-                    value={questionForm.correctAnswer}
-                    onChange={(e) => setQuestionForm({ ...questionForm, correctAnswer: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Enter correct answer"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Points</label>
-                  <input
-                    type="number"
-                    value={questionForm.points}
-                    onChange={(e) => setQuestionForm({ ...questionForm, points: Number(e.target.value) })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    min="1"
-                    max="100"
-                  />
-                </div>
-
-                <button
-                  onClick={() => handleCreateQuestion(selectedQuiz.id)}
-                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                >
-                  Add Question
-                </button>
+      <div className="bg-white rounded-lg shadow p-6">
+        {/* General Info Tab */}
+        {activeTab === 'general' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="md:col-span-2">
+                <Label htmlFor="title">
+                  Judul Quiz <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="title"
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => {
+                    setFormData({ ...formData, title: e.target.value });
+                    setHasUnsavedChanges(true);
+                  }}
+                  placeholder="Contoh: Quiz Alkitab Minggu Ini"
+                  required
+                />
               </div>
 
-              {/* Existing Questions */}
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">
-                  Existing Questions ({questions.length})
-                </h3>
-                
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {questions.map((question, index) => (
-                    <div key={question.id} className="border rounded-lg p-3">
-                      <div className="flex justify-between items-start mb-2">
-                        <div className="text-sm font-medium text-gray-900">
-                          Q{index + 1}: {(question as any).question || (question as any).text || 'Question text'}
-                        </div>
+              <div className="md:col-span-2">
+                <Label htmlFor="description">Deskripsi</Label>
+                <Textarea
+                  id="description"
+                  value={formData.description}
+                  onChange={(e) => {
+                    setFormData({ ...formData, description: e.target.value });
+                    setHasUnsavedChanges(true);
+                  }}
+                  rows={3}
+                  placeholder="Contoh: Quiz tentang bacaan Alkitab minggu ini"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location">Lokasi</Label>
+                <Select
+                  value={formData.locationKey || "none"}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, locationKey: value === "none" ? "" : value });
+                    setHasUnsavedChanges(true);
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih Lokasi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Semua Lokasi</SelectItem>
+                    {locationOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="service">Service</Label>
+                <Select
+                  value={formData.serviceKey || "none"}
+                  onValueChange={(value) => {
+                    setFormData({ ...formData, serviceKey: value === "none" ? "" : value });
+                    setHasUnsavedChanges(true);
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Pilih Service" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Semua Service</SelectItem>
+                    {serviceOptions.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="durationMinutes">Durasi (Menit)</Label>
+                <Input
+                  id="durationMinutes"
+                  type="number"
+                  value={formData.durationMinutes}
+                  onChange={(e) => {
+                    setFormData({ ...formData, durationMinutes: parseInt(e.target.value) || 30 });
+                    setHasUnsavedChanges(true);
+                  }}
+                  min="1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="passingScore">Nilai Lulus (%)</Label>
+                <Input
+                  id="passingScore"
+                  type="number"
+                  value={formData.passingScore}
+                  onChange={(e) => {
+                    setFormData({ ...formData, passingScore: parseInt(e.target.value) || 60 });
+                    setHasUnsavedChanges(true);
+                  }}
+                  min="0"
+                  max="100"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="questionsPerPage">Pertanyaan Per Halaman</Label>
+                <Input
+                  id="questionsPerPage"
+                  type="number"
+                  value={formData.questionsPerPage}
+                  onChange={(e) => {
+                    setFormData({ ...formData, questionsPerPage: parseInt(e.target.value) || 1 });
+                    setHasUnsavedChanges(true);
+                  }}
+                  min="1"
+                />
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* Questions Tab */}
+        {activeTab === 'questions' && (
+          <div className="space-y-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Pertanyaan Quiz</h3>
+              <Button onClick={handleAddQuestion} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                Tambah Pertanyaan
+              </Button>
+            </div>
+
+            {questions.length === 0 ? (
+              <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                <p className="text-gray-500 mb-4">Belum ada pertanyaan</p>
+                <Button onClick={handleAddQuestion} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Tambah Pertanyaan Pertama
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {questions.map((question, index) => (
+                  <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex items-start gap-3">
+                      <div className="flex flex-col gap-1 mt-1">
                         <button
-                          onClick={() => handleDeleteQuestion(question.id)}
-                          className="text-red-600 hover:text-red-800 text-sm"
+                          onClick={() => handleMoveQuestion(index, 'up')}
+                          disabled={index === 0}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
                         >
-                          🗑️
+                          <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <GripVertical className="w-4 h-4 text-gray-400" />
+                        <button
+                          onClick={() => handleMoveQuestion(index, 'down')}
+                          disabled={index === questions.length - 1}
+                          className="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed"
+                        >
+                          <ChevronDown className="w-4 h-4" />
                         </button>
                       </div>
-                      
-                      <div className="text-xs text-gray-500">
-                        Type: {question.type} • Points: {question.points}
-                      </div>
-                      
-                      {question.options && question.options.length > 0 && (
-                        <div className="mt-2 text-xs text-gray-600">
-                          Options: {question.options.join(', ')}
+
+                      <div className="flex-1">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-semibold text-sm">#{index + 1}</span>
+                              <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                {question.questionType === 'multiple_choice' ? 'Pilihan Ganda' :
+                                 question.questionType === 'true_false' ? 'Benar/Salah' : 'Essay'}
+                              </span>
+                              <span className="text-xs text-gray-500">({question.points} poin)</span>
+                            </div>
+                            <p className="text-sm font-medium">{question.questionText}</p>
+                            
+                            {question.imageUrl && (
+                              <div className="mt-2 border rounded-lg p-2 bg-white inline-block">
+                                <img 
+                                  src={question.imageUrl} 
+                                  alt="Question image" 
+                                  className="max-w-xs h-auto max-h-32 rounded"
+                                  onError={(e) => {
+                                    e.currentTarget.style.display = 'none';
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => handleEditQuestion(question, index)}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteQuestion(index)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
-                      )}
+
+                        {question.questionType === 'multiple_choice' && question.options.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {question.options.map((option, optIndex) => (
+                              <div key={optIndex} className="flex items-center gap-2 text-sm">
+                                <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
+                                  question.correctAnswers.includes(option)
+                                    ? 'bg-green-100 text-green-700 font-semibold'
+                                    : 'bg-gray-200 text-gray-600'
+                                }`}>
+                                  {String.fromCharCode(65 + optIndex)}
+                                </span>
+                                <span className={question.correctAnswers.includes(option) ? 'font-medium' : ''}>
+                                  {option}
+                                </span>
+                                {question.correctAnswers.includes(option) && (
+                                  <CheckCircle className="w-3 h-3 text-green-600 ml-1" />
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {question.questionType === 'true_false' && (
+                          <div className="mt-2 text-sm">
+                            <span className="text-gray-600">Jawaban benar: </span>
+                            <span className="font-medium">
+                              {question.correctAnswers.includes('true') ? 'Benar' : 'Salah'}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ))}
-                  
-                  {questions.length === 0 && (
-                    <div className="text-center py-8 text-gray-500">
-                      No questions added yet. Create your first question!
-                    </div>
-                  )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Scoring Tab */}
+        {activeTab === 'scoring' && (
+          <div className="space-y-4">
+            <div className="space-y-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Pemetaan Scoring</h3>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleGenerateDefaultScoring} 
+                    size="sm"
+                    variant="outline"
+                  >
+                    Generate Default (0-35)
+                  </Button>
+                  <Button onClick={() => {
+                    setEditingScoring({ correctAnswers: scoringMap.length, score: 0 });
+                    setShowScoringDialog(true);
+                  }} size="sm">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Tambah Scoring
+                  </Button>
                 </div>
               </div>
+
+              {scoringMap.length === 0 ? (
+                <div className="text-center py-12 border-2 border-dashed border-gray-300 rounded-lg">
+                  <p className="text-gray-500 mb-4">Belum ada pemetaan scoring</p>
+                  <div className="flex gap-2 justify-center">
+                    <Button onClick={() => {
+                      setEditingScoring({ correctAnswers: 0, score: 73 });
+                      setShowScoringDialog(true);
+                    }} variant="outline">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Tambah Scoring Manual
+                    </Button>
+                    <Button onClick={handleGenerateDefaultScoring}>
+                      Generate Default (0-35)
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 border">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Jumlah Benar
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Score
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Aksi
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {scoringMap
+                        .sort((a, b) => a.correctAnswers - b.correctAnswers)
+                        .map((scoring, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {scoring.correctAnswers}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {scoring.score}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              onClick={() => {
+                                setEditingScoring({ ...scoring });
+                                setShowScoringDialog(true);
+                              }}
+                              className="text-blue-600 hover:text-blue-800 mr-4"
+                            >
+                              <Edit2 className="w-4 h-4 inline" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                const newMap = scoringMap.filter((_, i) => i !== index);
+                                setScoringMap(newMap);
+                              }}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
+        )}
+
+        {/* Metadata Section */}
+        {!isCreateMode && (metadata.createdAt || metadata.updatedAt) && (
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <h3 className="text-sm font-semibold text-gray-700 mb-3">Informasi</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              {metadata.createdAt && (
+                <div>
+                  <span className="text-gray-500">Dibuat pada:</span>
+                  <p className="font-medium text-gray-900">
+                    {new Date(metadata.createdAt).toLocaleString('id-ID', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                    {metadata.createdBy && (
+                      <span className="text-gray-600"> oleh {metadata.createdBy}</span>
+                    )}
+                  </p>
+                </div>
+              )}
+              {metadata.updatedAt && (
+                <div>
+                  <span className="text-gray-500">Terakhir diubah:</span>
+                  <p className="font-medium text-gray-900">
+                    {new Date(metadata.updatedAt).toLocaleString('id-ID', {
+                      day: '2-digit',
+                      month: 'long',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-between items-center mt-6 pt-6 border-t"><div>
+            {!isCreateMode && (
+              <Button
+                variant="destructive"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={deleting || saving}
+              >
+                {deleting ? 'Menghapus...' : 'Hapus Quiz'}
+              </Button>
+            )}
+          </div>
+          <div className="flex space-x-3">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  if (confirm('Anda memiliki perubahan yang belum disimpan. Yakin ingin membatalkan?')) {
+                    router.push("/admin/quizzes");
+                  }
+                } else {
+                  router.push("/admin/quizzes");
+                }
+              }}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={saving || deleting}
+            >
+              {saving ? 'Menyimpan...' : (isCreateMode ? 'Buat Quiz' : 'Update Quiz')}
+            </Button>
+          </div>
         </div>
-      )}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center bg-red-100">
+                <XCircle className="w-5 h-5 text-red-600" />
+              </div>
+              Konfirmasi Hapus
+            </DialogTitle>
+            <DialogDescription>
+              Apakah Anda yakin ingin menghapus quiz ini? Tindakan ini tidak dapat dibatalkan.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteConfirm(false)}
+              disabled={deleting}
+            >
+              Batal
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={deleting}
+            >
+              {deleting ? 'Menghapus...' : 'Ya, Hapus'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Success/Error Dialog */}
+      <Dialog open={showDialog} onOpenChange={(open) => {
+        if (!open) return;
+        setShowDialog(open);
+      }}>
+        <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                dialogType === 'success' ? 'bg-green-100' : 'bg-red-100'
+              }`}>
+                {dialogType === 'success' ? (
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                ) : (
+                  <XCircle className="w-5 h-5 text-red-600" />
+                )}
+              </div>
+              {dialogType === 'success' ? 'Success' : 'Error'}
+            </DialogTitle>
+            <DialogDescription>
+              {dialogMessage}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              onClick={handleDialogClose}
+              variant={dialogType === 'success' ? 'default' : 'destructive'}
+            >
+              {dialogType === 'success' ? 'OK' : 'Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Question Add/Edit Dialog */}
+      <Dialog open={showQuestionDialog} onOpenChange={setShowQuestionDialog}>
+        <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {editingQuestion?.id ? 'Edit Pertanyaan' : 'Tambah Pertanyaan'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingQuestion && (
+            <div className="space-y-4 py-4">
+              {/* Error Message */}
+              {questionError && (
+                <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg flex items-start gap-2">
+                  <XCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm">{questionError}</p>
+                </div>
+              )}
+
+              <div>
+                <Label htmlFor="questionText">
+                  Pertanyaan <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="questionText"
+                  value={editingQuestion.questionText}
+                  onChange={(e) => {
+                    setEditingQuestion({ ...editingQuestion, questionText: e.target.value });
+                    if (questionError) setQuestionError('');
+                  }}
+                  placeholder="Tulis pertanyaan di sini..."
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="imageUrl">
+                  URL Gambar (Opsional)
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="imageUrl"
+                    type="url"
+                    value={editingQuestion.imageUrl || ''}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, imageUrl: e.target.value })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                  {editingQuestion.imageUrl && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={() => window.open(editingQuestion.imageUrl, '_blank')}
+                      title="Preview gambar"
+                    >
+                      <ImageIcon className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+                {editingQuestion.imageUrl && (
+                  <div className="mt-2 border rounded-lg p-2 bg-gray-50">
+                    <img 
+                      src={editingQuestion.imageUrl} 
+                      alt="Preview" 
+                      className="max-w-full h-auto max-h-48 mx-auto rounded"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none';
+                        e.currentTarget.nextElementSibling!.classList.remove('hidden');
+                      }}
+                    />
+                    <p className="text-sm text-red-500 text-center mt-2 hidden">
+                      Gagal memuat gambar. Periksa URL gambar.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="questionType">Tipe Pertanyaan</Label>
+                  <Select
+                    value={editingQuestion.questionType}
+                    onValueChange={(value: QuestionType) => {
+                      const newQuestion = { ...editingQuestion, questionType: value };
+                      if (value === 'true_false') {
+                        newQuestion.options = ['true', 'false'];
+                        newQuestion.correctAnswers = [];
+                      } else if (value === 'essay') {
+                        newQuestion.options = [];
+                        newQuestion.correctAnswers = [];
+                      } else if (editingQuestion.questionType !== 'multiple_choice') {
+                        newQuestion.options = ['', '', '', ''];
+                        newQuestion.correctAnswers = [];
+                      }
+                      setEditingQuestion(newQuestion);
+                    }}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="multiple_choice">Pilihan Ganda</SelectItem>
+                      <SelectItem value="true_false">Benar/Salah</SelectItem>
+                      <SelectItem value="essay">Essay</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="points">Poin</Label>
+                  <Input
+                    id="points"
+                    type="number"
+                    value={editingQuestion.points}
+                    onChange={(e) => setEditingQuestion({ ...editingQuestion, points: parseInt(e.target.value) || 1 })}
+                    min="1"
+                  />
+                </div>
+              </div>
+
+              {editingQuestion.questionType === 'multiple_choice' && (
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <Label>Pilihan Jawaban <span className="text-red-500">*</span></Label>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={addOptionToEditingQuestion}
+                    >
+                      <Plus className="w-4 h-4 mr-1" />
+                      Tambah Pilihan
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {editingQuestion.options.map((option, index) => {
+                      const isOptionEmpty = !option || option.trim() === '';
+                      return (
+                        <div key={index} className="flex gap-2 items-center">
+                          <input
+                            type="checkbox"
+                            checked={editingQuestion.correctAnswers.includes(option)}
+                            onChange={() => toggleCorrectAnswer(option)}
+                            disabled={isOptionEmpty}
+                            className={`w-4 h-4 ${isOptionEmpty ? 'opacity-50 cursor-not-allowed' : 'text-green-600 cursor-pointer'}`}
+                            title={isOptionEmpty ? 'Isi jawaban terlebih dahulu' : 'Centang jika jawaban benar'}
+                          />
+                          <span className="w-6 text-center font-medium text-sm">
+                            {String.fromCharCode(65 + index)}.
+                          </span>
+                          <Input
+                            value={option}
+                            onChange={(e) => updateEditingQuestionOption(index, e.target.value)}
+                            placeholder={`Pilihan ${String.fromCharCode(65 + index)}`}
+                            className="flex-1"
+                          />
+                          {editingQuestion.options.length > 2 && (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removeOptionFromEditingQuestion(index)}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    ✓ Centang kotak di sebelah kiri untuk menandai jawaban yang benar (harus isi jawaban dulu)
+                  </p>
+                </div>
+              )}
+
+              {editingQuestion.questionType === 'true_false' && (
+                <div>
+                  <Label>Jawaban Benar <span className="text-red-500">*</span></Label>
+                  <div className="flex gap-4 mt-2">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="trueFalse"
+                        checked={editingQuestion.correctAnswers.includes('true')}
+                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswers: ['true'] })}
+                        className="w-4 h-4"
+                      />
+                      <span>Benar</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="trueFalse"
+                        checked={editingQuestion.correctAnswers.includes('false')}
+                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswers: ['false'] })}
+                        className="w-4 h-4"
+                      />
+                      <span>Salah</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {editingQuestion.questionType === 'essay' && (
+                <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                  <p className="text-sm text-blue-800">
+                    <strong>Info:</strong> Pertanyaan essay akan dinilai secara manual oleh admin.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleQuestionDialogClose}>
+              Batal
+            </Button>
+            <Button onClick={handleSaveQuestion}>
+              Simpan Pertanyaan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scoring Dialog */}
+      <Dialog open={showScoringDialog} onOpenChange={setShowScoringDialog}>
+        <DialogContent 
+          className="max-w-md"
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {editingScoring && scoringMap.find(s => s.correctAnswers === editingScoring.correctAnswers) 
+                ? 'Edit Scoring' 
+                : 'Tambah Scoring'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {editingScoring && (
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="correctAnswers">
+                  Jumlah Jawaban Benar <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="correctAnswers"
+                  type="number"
+                  min="0"
+                  value={editingScoring.correctAnswers}
+                  onChange={(e) => setEditingScoring({
+                    ...editingScoring,
+                    correctAnswers: parseInt(e.target.value) || 0
+                  })}
+                  placeholder="Contoh: 10"
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="score">
+                  Score <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="score"
+                  type="number"
+                  min="0"
+                  value={editingScoring.score}
+                  onChange={(e) => setEditingScoring({
+                    ...editingScoring,
+                    score: parseInt(e.target.value) || 0
+                  })}
+                  placeholder="Contoh: 85"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowScoringDialog(false);
+                setEditingScoring(null);
+              }}
+            >
+              Batal
+            </Button>
+            <Button onClick={handleSaveScoring}>
+              Simpan
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Copy as Template Dialog */}
+      <Dialog open={showCopyDialog} onOpenChange={setShowCopyDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Copy Quiz sebagai Template</DialogTitle>
+            <DialogDescription>
+              Buat quiz baru dengan meng-copy semua pertanyaan, scoring, dan pengaturan dari quiz ini. 
+              Quiz baru akan dibuat dengan status tidak aktif.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="copyTitle">
+                Nama Quiz Baru <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="copyTitle"
+                type="text"
+                value={copyFormData.title}
+                onChange={(e) => setCopyFormData({ ...copyFormData, title: e.target.value })}
+                placeholder="Contoh: Quiz Alkitab Januari 2024"
+                required
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="copyLocation">Location</Label>
+              <Select
+                value={copyFormData.locationKey || "none"}
+                onValueChange={(value) => setCopyFormData({ ...copyFormData, locationKey: value === "none" ? "" : value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih Lokasi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Semua Lokasi</SelectItem>
+                  {locationOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="copyService">Service</Label>
+              <Select
+                value={copyFormData.serviceKey || "none"}
+                onValueChange={(value) => setCopyFormData({ ...copyFormData, serviceKey: value === "none" ? "" : value })}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Pilih Service" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Semua Service</SelectItem>
+                  {serviceOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Yang akan di-copy:</strong>
+              </p>
+              <ul className="text-sm text-blue-700 mt-1 ml-4 list-disc">
+                <li>{questions.length} pertanyaan</li>
+                <li>{scoringMap.length} pemetaan scoring</li>
+                <li>Semua pengaturan quiz (durasi, passing score, dll)</li>
+              </ul>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowCopyDialog(false)}
+              disabled={copying}
+            >
+              Batal
+            </Button>
+            <Button
+              onClick={handleSubmitCopy}
+              disabled={copying || !copyFormData.title.trim()}
+            >
+              {copying ? 'Meng-copy...' : 'Copy Quiz'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

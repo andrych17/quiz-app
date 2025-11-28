@@ -115,7 +115,7 @@ function AdminLayoutInner({
       />
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 relative z-30">
+        <header className="bg-white shadow-sm border-b border-gray-200 px-4 sm:px-6 py-3 sm:py-4 relative z-10">
           <div className="flex justify-between items-center">
             <div className="flex items-center space-x-3 sm:space-x-4">
               {/* Mobile menu button */}
@@ -154,7 +154,7 @@ function AdminLayoutInner({
 
               {/* Dropdown Menu */}
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 border profile-dropdown">
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-[9999] border profile-dropdown">
                   <div className="px-4 py-2 border-b">
                     <div className="text-sm font-medium text-gray-900">{user?.name || 'Admin'}</div>
                     <div className="text-sm text-gray-500">{user?.email || 'admin@example.com'}</div>
