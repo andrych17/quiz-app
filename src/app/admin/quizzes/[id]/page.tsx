@@ -312,21 +312,30 @@ export default function QuizDetailPage({ params }: PageProps) {
           // Convert questionType format: multiple_choice -> multiple-choice
           let apiQuestionType = q.questionType.replace(/_/g, '-');
           
-          // Backend expects correctAnswers (plural) as array
-          // For essay questions, use ['essay'] as placeholder
-          const correctAnswers = q.questionType === 'essay' 
-            ? ['essay'] 
-            : (q.correctAnswers.length > 0 ? q.correctAnswers : ['']);
-          
-          return {
+          // Build question object
+          const questionData: any = {
             questionText: q.questionText,
             questionType: apiQuestionType,
-            options: q.options,
-            correctAnswers: correctAnswers,
+            options: q.options || [],
             order: index,
           };
+          
+          // Only add correctAnswers if not essay and has valid answers
+          if (q.questionType !== 'essay' && Array.isArray(q.correctAnswers)) {
+            const validAnswers = q.correctAnswers.filter(a => a && a.trim() !== '');
+            if (validAnswers.length > 0) {
+              questionData.correctAnswers = validAnswers;
+            }
+          }
+          
+          return questionData;
         });
       }
+
+      console.log('=== SENDING TO BACKEND ===');
+      console.log('Quiz data:', JSON.stringify(quizData, null, 2));
+      console.log('Questions:', quizData.questions);
+      console.log('========================');
 
       let result;
       if (isCreateMode) {
@@ -440,18 +449,24 @@ export default function QuizDetailPage({ params }: PageProps) {
       if (questions.length > 0) {
         quizData.questions = questions.map((q, index) => {
           let apiQuestionType = q.questionType.replace(/_/g, '-');
-          // Backend expects correctAnswers (plural) as array
-          const correctAnswers = q.questionType === 'essay'
-            ? ['essay']
-            : (q.correctAnswers.length > 0 ? q.correctAnswers : ['']);
           
-          return {
+          // Build question object
+          const questionData: any = {
             questionText: q.questionText,
             questionType: apiQuestionType,
-            options: q.options,
-            correctAnswers: correctAnswers,
+            options: q.options || [],
             order: index,
           };
+          
+          // Only add correctAnswers if not essay and has valid answers
+          if (q.questionType !== 'essay' && Array.isArray(q.correctAnswers)) {
+            const validAnswers = q.correctAnswers.filter(a => a && a.trim() !== '');
+            if (validAnswers.length > 0) {
+              questionData.correctAnswers = validAnswers;
+            }
+          }
+          
+          return questionData;
         });
       }
 
@@ -1003,7 +1018,6 @@ export default function QuizDetailPage({ params }: PageProps) {
                                 {question.questionType === 'multiple_choice' ? 'Pilihan Ganda' :
                                  question.questionType === 'true_false' ? 'Benar/Salah' : 'Essay'}
                               </span>
-                              <span className="text-xs text-gray-500">({question.points} poin)</span>
                             </div>
                             <p className="text-sm font-medium">{question.questionText}</p>
                             
@@ -1394,47 +1408,34 @@ export default function QuizDetailPage({ params }: PageProps) {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="questionType">Tipe Pertanyaan</Label>
-                  <Select
-                    value={editingQuestion.questionType}
-                    onValueChange={(value: QuestionType) => {
-                      const newQuestion = { ...editingQuestion, questionType: value };
-                      if (value === 'true_false') {
-                        newQuestion.options = ['true', 'false'];
-                        newQuestion.correctAnswers = [];
-                      } else if (value === 'essay') {
-                        newQuestion.options = [];
-                        newQuestion.correctAnswers = [];
-                      } else if (editingQuestion.questionType !== 'multiple_choice') {
-                        newQuestion.options = ['', '', '', ''];
-                        newQuestion.correctAnswers = [];
-                      }
-                      setEditingQuestion(newQuestion);
-                    }}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="multiple_choice">Pilihan Ganda</SelectItem>
-                      <SelectItem value="true_false">Benar/Salah</SelectItem>
-                      <SelectItem value="essay">Essay</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="points">Poin</Label>
-                  <Input
-                    id="points"
-                    type="number"
-                    value={editingQuestion.points}
-                    onChange={(e) => setEditingQuestion({ ...editingQuestion, points: parseInt(e.target.value) || 1 })}
-                    min="1"
-                  />
-                </div>
+              <div>
+                <Label htmlFor="questionType">Tipe Pertanyaan</Label>
+                <Select
+                  value={editingQuestion.questionType}
+                  onValueChange={(value: QuestionType) => {
+                    const newQuestion = { ...editingQuestion, questionType: value };
+                    if (value === 'true_false') {
+                      newQuestion.options = ['true', 'false'];
+                      newQuestion.correctAnswers = [];
+                    } else if (value === 'essay') {
+                      newQuestion.options = [];
+                      newQuestion.correctAnswers = [];
+                    } else if (editingQuestion.questionType !== 'multiple_choice') {
+                      newQuestion.options = ['', '', '', ''];
+                      newQuestion.correctAnswers = [];
+                    }
+                    setEditingQuestion(newQuestion);
+                  }}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="multiple_choice">Pilihan Ganda</SelectItem>
+                    <SelectItem value="true_false">Benar/Salah</SelectItem>
+                    <SelectItem value="essay">Essay</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {editingQuestion.questionType === 'multiple_choice' && (
