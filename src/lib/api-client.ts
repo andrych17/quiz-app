@@ -428,12 +428,36 @@ export class QuestionsAPI extends BaseApiClient {
  * Attempt Management API client
  */
 export class AttemptsAPI extends BaseApiClient {
-  static async getAttempts(): Promise<ApiResponse<Attempt[]>> {
-    return this.request<Attempt[]>('/attempts');
+  // Get attempts with pagination and filters
+  static async getAttempts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    serviceKey?: string;
+    locationKey?: string;
+    quizId?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    const url = queryParams.toString() ? `/attempts?${queryParams.toString()}` : '/attempts';
+    return this.request<any>(url);
   }
 
   static async getAttempt(id: number): Promise<ApiResponse<Attempt>> {
     return this.request<Attempt>(`/attempts/${id}`);
+  }
+
+  // Get attempt with detailed answers for viewing/reviewing
+  static async getAttemptWithAnswers(id: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/${id}/view`);
   }
 
   static async createAttempt(attemptData: Partial<Attempt>): Promise<ApiResponse<Attempt>> {
@@ -460,8 +484,8 @@ export class AttemptsAPI extends BaseApiClient {
     return this.request<AttemptAnswer[]>(`/attempts/${id}/answers`);
   }
 
-  static async exportQuizAttempts(quizId: number, format: 'csv' | 'excel' = 'csv'): Promise<ApiResponse<{ downloadUrl: string }>> {
-    return this.request<{ downloadUrl: string }>(`/attempts/quiz/${quizId}/export?format=${format}`);
+  static async exportQuizAttempts(quizId: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/quiz/${quizId}/export`);
   }
 }
 
@@ -695,6 +719,78 @@ export class AdminAPI extends BaseApiClient {
       method: 'POST',
     });
   }
+
+  // Quiz Results/Attempts Management
+  static async getAllAttempts(params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+    serviceKey?: string;
+    locationKey?: string;
+    quizId?: number;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<ApiResponse<any>> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    return this.request<any>(`/attempts?${queryParams.toString()}`);
+  }
+
+  static async getAttemptById(id: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/${id}`);
+  }
+
+  static async getAttemptWithAnswers(id: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/${id}/view`);
+  }
+
+  static async deleteAttempt(id: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  static async exportQuizAttempts(quizId: number): Promise<ApiResponse<any>> {
+    return this.request<any>(`/attempts/quiz/${quizId}/export`);
+  }
+}
+
+/**
+ * Public Quiz API client (no authentication required)
+ */
+export class PublicAPI extends BaseApiClient {
+  static async getPublicQuiz(token: string): Promise<ApiResponse<Quiz>> {
+    return this.request<Quiz>(`/public/quiz/${token}`);
+  }
+
+  static async submitQuiz(token: string, submitData: {
+    participantName: string;
+    email: string;
+    nij: string;
+    quizId: number;
+    answers: Array<{
+      questionId: number;
+      answer: string;
+    }>;
+  }): Promise<ApiResponse<Attempt>> {
+    return this.request<Attempt>(`/public/quiz/${token}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(submitData),
+    });
+  }
+
+  static async checkQuizSubmission(token: string, checkData: { nij: string; email?: string }): Promise<ApiResponse<any>> {
+    return this.request<any>(`/public/quiz/${token}/check`, {
+      method: 'POST',
+      body: JSON.stringify(checkData),
+    });
+  }
 }
 
 /**
@@ -710,6 +806,7 @@ export const API = {
   config: ConfigAPI,
   admin: AdminAPI,
   userQuizAssignments: UserQuizAssignmentsAPI,
+  public: PublicAPI,
 };
 
 // Legacy compatibility

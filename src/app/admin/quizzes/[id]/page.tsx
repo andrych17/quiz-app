@@ -31,7 +31,7 @@ interface Question {
   questionType: QuestionType;
   imageUrl?: string;
   options: string[];
-  correctAnswers: string[];
+  correctAnswer: string[];
   points: number;
   order: number;
   isRequired: boolean;
@@ -75,9 +75,9 @@ export default function QuizDetailPage({ params }: PageProps) {
   const [questionError, setQuestionError] = useState<string>('');
 
   // Scoring templates state - Simple mapping of correct answers to scores
-  const [scoringMap, setScoringMap] = useState<Array<{correctAnswers: number, score: number}>>([]);
+  const [scoringMap, setScoringMap] = useState<Array<{correctAnswer: number, score: number}>>([]);
   const [showScoringDialog, setShowScoringDialog] = useState(false);
-  const [editingScoring, setEditingScoring] = useState<{correctAnswers: number, score: number} | null>(null);
+  const [editingScoring, setEditingScoring] = useState<{correctAnswer: number, score: number} | null>(null);
 
   // Quiz token/link state
   const [quizToken, setQuizToken] = useState<string>('');
@@ -130,9 +130,12 @@ export default function QuizDetailPage({ params }: PageProps) {
     if (!quizId) return;
     
     const loadData = async () => {
+      console.log('🚀 Main useEffect triggered - isCreateMode:', isCreateMode, 'quizId:', quizId);
       if (!isCreateMode) {
+        console.log('📝 Loading existing quiz data...');
         await loadQuizData();
       } else {
+        console.log('🆕 Create mode - loading options only...');
         await loadOptions();
       }
     };
@@ -141,8 +144,10 @@ export default function QuizDetailPage({ params }: PageProps) {
   }, [quizId, isCreateMode]);
 
   const loadOptions = async () => {
+    console.log('🔄 Starting loadOptions for create mode...');
     try {
       setLoading(true);
+      console.log('📡 Loading location and service options...');
 
       const [locationRes, serviceRes] = await Promise.all([
         API.config.getConfigsByGroup('location'),
@@ -168,21 +173,33 @@ export default function QuizDetailPage({ params }: PageProps) {
       }
 
     } catch (err: any) {
-      console.error('Failed to load options:', err);
+      console.error('❌ Failed to load options:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack
+      });
     } finally {
+      console.log('✅ loadOptions completed, setting loading to false');
       setLoading(false);
     }
   };
 
   const loadQuizData = async () => {
+    console.log('🔄 Starting loadQuizData for quizId:', quizId);
     try {
       setLoading(true);
+      console.log('📡 Making API calls for quiz, locations, and services...');
 
       const [quizRes, locationRes, serviceRes] = await Promise.all([
         API.quizzes.getQuiz(Number(quizId)),
         API.config.getConfigsByGroup('location'),
         API.config.getConfigsByGroup('service')
       ]);
+
+      console.log('📨 API Responses received:');
+      console.log('Quiz response:', quizRes);
+      console.log('Location response:', locationRes);
+      console.log('Service response:', serviceRes);
 
       if (locationRes?.success) {
         const locationData = locationRes.data || [];
@@ -244,7 +261,7 @@ export default function QuizDetailPage({ params }: PageProps) {
             questionType: frontendQuestionType as QuestionType,
             imageUrl: q.imageUrl || '',
             options: q.options || [],
-            correctAnswers: q.correctAnswers || [],
+            correctAnswer: q.correctAnswer || [],
             points: q.points || 1,
             order: q.order !== undefined ? q.order : index,
             isRequired: q.isRequired !== undefined ? q.isRequired : true,
@@ -259,18 +276,24 @@ export default function QuizDetailPage({ params }: PageProps) {
         // Load scoring map - convert from backend format if needed
         const scoringData = quizData.scoringTemplates || [];
         const scoreMap = scoringData.map((s: any, index: number) => ({
-          correctAnswers: index,
+          correctAnswer: index,
           score: s.maxScore || 0
         }));
         setScoringMap(scoreMap);
       }
 
     } catch (err: any) {
-      console.error('Failed to load quiz data:', err);
+      console.error('❌ Failed to load quiz data:', err);
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        quizId: quizId
+      });
       setDialogType('error');
       setDialogMessage(err?.message || 'Failed to load quiz data');
       setShowDialog(true);
     } finally {
+      console.log('✅ loadQuizData completed, setting loading to false');
       setLoading(false);
     }
   };
@@ -300,7 +323,7 @@ export default function QuizDetailPage({ params }: PageProps) {
       // Add scoring map as templates if any
       if (scoringMap.length > 0) {
         quizData.scoringTemplates = scoringMap.map(s => ({
-          grade: `${s.correctAnswers} Benar`,
+          grade: `${s.correctAnswer} Benar`,
           maxScore: s.score,
           minScore: s.score,
         }));
@@ -312,20 +335,40 @@ export default function QuizDetailPage({ params }: PageProps) {
           // Convert questionType format: multiple_choice -> multiple-choice
           let apiQuestionType = q.questionType.replace(/_/g, '-');
           
+          // Filter out empty options before sending to backend
+          const filteredOptions = (q.options || []).filter(option => 
+            option && typeof option === 'string' && option.trim() !== ''
+          );
+          
           // Build question object
           const questionData: any = {
             questionText: q.questionText,
             questionType: apiQuestionType,
-            options: q.options || [],
+            options: filteredOptions,
             order: index,
           };
           
-          // Only add correctAnswers if not essay and has valid answers
-          if (q.questionType !== 'essay' && Array.isArray(q.correctAnswers)) {
-            const validAnswers = q.correctAnswers.filter(a => a && a.trim() !== '');
-            if (validAnswers.length > 0) {
-              questionData.correctAnswers = validAnswers;
+          // Add correctAnswer (singular, string) if not essay and has valid answer
+          if (q.questionType !== 'essay') {
+            if (Array.isArray(q.correctAnswer)) {
+              // Handle array format (multiple answers)
+              const validAnswers = q.correctAnswer.filter(a => a && a.trim() !== '');
+              if (validAnswers.length > 0) {
+                // Backend expects string, so join array or take first valid answer
+                questionData.correctAnswer = validAnswers[0];
+              }
+            } else if (typeof q.correctAnswer === 'string' && (q.correctAnswer as string).trim() !== '') {
+              // Handle string format (single answer) 
+              questionData.correctAnswer = q.correctAnswer as string;
             }
+            
+            // Log for debugging
+            console.log(`Question ${index + 1} correctAnswer:`, {
+              original: q.correctAnswer,
+              type: typeof q.correctAnswer,
+              isArray: Array.isArray(q.correctAnswer),
+              final: questionData.correctAnswer
+            });
           }
           
           return questionData;
@@ -458,11 +501,12 @@ export default function QuizDetailPage({ params }: PageProps) {
             order: index,
           };
           
-          // Only add correctAnswers if not essay and has valid answers
-          if (q.questionType !== 'essay' && Array.isArray(q.correctAnswers)) {
-            const validAnswers = q.correctAnswers.filter(a => a && a.trim() !== '');
+          // Add correctAnswer (singular, string) if not essay and has valid answer
+          if (q.questionType !== 'essay' && Array.isArray(q.correctAnswer)) {
+            const validAnswers = q.correctAnswer.filter(a => a && a.trim() !== '');
             if (validAnswers.length > 0) {
-              questionData.correctAnswers = validAnswers;
+              // Backend expects string, so join array or take first valid answer
+              questionData.correctAnswer = validAnswers[0];
             }
           }
           
@@ -473,7 +517,7 @@ export default function QuizDetailPage({ params }: PageProps) {
       // Copy scoring map
       if (scoringMap.length > 0) {
         quizData.scoringTemplates = scoringMap.map(s => ({
-          grade: `${s.correctAnswers} Benar`,
+          grade: `${s.correctAnswer} Benar`,
           maxScore: s.score,
           minScore: s.score,
         }));
@@ -518,7 +562,7 @@ export default function QuizDetailPage({ params }: PageProps) {
       questionType: 'multiple_choice',
       imageUrl: '',
       options: ['', '', '', ''],
-      correctAnswers: [],
+      correctAnswer: [],
       points: 1,
       order: questions.length,
       isRequired: true,
@@ -575,7 +619,7 @@ export default function QuizDetailPage({ params }: PageProps) {
     }
 
     // Essay questions don't need correct answers
-    if (editingQuestion.questionType !== 'essay' && editingQuestion.correctAnswers.length === 0) {
+    if (editingQuestion.questionType !== 'essay' && editingQuestion.correctAnswer.length === 0) {
       setQuestionError('Pilih minimal satu jawaban yang benar');
       return;
     }
@@ -631,11 +675,11 @@ export default function QuizDetailPage({ params }: PageProps) {
     if (!editingQuestion || editingQuestion.options.length <= 2) return;
     const newOptions = editingQuestion.options.filter((_, i) => i !== index);
     // Remove from correct answers if it was selected
-    const newCorrectAnswers = editingQuestion.correctAnswers.filter(a => a !== editingQuestion.options[index]);
+    const newcorrectAnswer = editingQuestion.correctAnswer.filter(a => a !== editingQuestion.options[index]);
     setEditingQuestion({
       ...editingQuestion,
       options: newOptions,
-      correctAnswers: newCorrectAnswers,
+      correctAnswer: newcorrectAnswer,
     });
   };
 
@@ -647,13 +691,13 @@ export default function QuizDetailPage({ params }: PageProps) {
       return;
     }
     
-    const isSelected = editingQuestion.correctAnswers.includes(option);
-    const newCorrectAnswers = isSelected
-      ? editingQuestion.correctAnswers.filter(a => a !== option)
-      : [...editingQuestion.correctAnswers, option];
+    const isSelected = editingQuestion.correctAnswer.includes(option);
+    const newcorrectAnswer = isSelected
+      ? editingQuestion.correctAnswer.filter(a => a !== option)
+      : [...editingQuestion.correctAnswer, option];
     setEditingQuestion({
       ...editingQuestion,
-      correctAnswers: newCorrectAnswers,
+      correctAnswer: newcorrectAnswer,
     });
     // Clear error when user makes changes
     if (questionError) setQuestionError('');
@@ -669,8 +713,8 @@ export default function QuizDetailPage({ params }: PageProps) {
       return;
     }
 
-    // Check if correctAnswers already exists
-    const existingIndex = scoringMap.findIndex(s => s.correctAnswers === editingScoring.correctAnswers);
+    // Check if correctAnswer already exists
+    const existingIndex = scoringMap.findIndex(s => s.correctAnswer === editingScoring.correctAnswer);
     
     if (existingIndex >= 0) {
       // Update existing
@@ -690,18 +734,18 @@ export default function QuizDetailPage({ params }: PageProps) {
   const handleGenerateDefaultScoring = () => {
     // Generate default scoring based on example data provided
     const defaultScoring = [
-      {correctAnswers: 0, score: 73}, {correctAnswers: 1, score: 73}, {correctAnswers: 2, score: 73},
-      {correctAnswers: 3, score: 73}, {correctAnswers: 4, score: 73}, {correctAnswers: 5, score: 73},
-      {correctAnswers: 6, score: 73}, {correctAnswers: 7, score: 73}, {correctAnswers: 8, score: 77},
-      {correctAnswers: 9, score: 79}, {correctAnswers: 10, score: 84}, {correctAnswers: 11, score: 84},
-      {correctAnswers: 12, score: 88}, {correctAnswers: 13, score: 88}, {correctAnswers: 14, score: 92},
-      {correctAnswers: 15, score: 92}, {correctAnswers: 16, score: 94}, {correctAnswers: 17, score: 94},
-      {correctAnswers: 18, score: 98}, {correctAnswers: 19, score: 98}, {correctAnswers: 20, score: 101},
-      {correctAnswers: 21, score: 101}, {correctAnswers: 22, score: 104}, {correctAnswers: 23, score: 104},
-      {correctAnswers: 24, score: 108}, {correctAnswers: 25, score: 108}, {correctAnswers: 26, score: 112},
-      {correctAnswers: 27, score: 112}, {correctAnswers: 28, score: 116}, {correctAnswers: 29, score: 116},
-      {correctAnswers: 30, score: 120}, {correctAnswers: 31, score: 120}, {correctAnswers: 32, score: 123},
-      {correctAnswers: 33, score: 125}, {correctAnswers: 34, score: 132}, {correctAnswers: 35, score: 139},
+      {correctAnswer: 0, score: 73}, {correctAnswer: 1, score: 73}, {correctAnswer: 2, score: 73},
+      {correctAnswer: 3, score: 73}, {correctAnswer: 4, score: 73}, {correctAnswer: 5, score: 73},
+      {correctAnswer: 6, score: 73}, {correctAnswer: 7, score: 73}, {correctAnswer: 8, score: 77},
+      {correctAnswer: 9, score: 79}, {correctAnswer: 10, score: 84}, {correctAnswer: 11, score: 84},
+      {correctAnswer: 12, score: 88}, {correctAnswer: 13, score: 88}, {correctAnswer: 14, score: 92},
+      {correctAnswer: 15, score: 92}, {correctAnswer: 16, score: 94}, {correctAnswer: 17, score: 94},
+      {correctAnswer: 18, score: 98}, {correctAnswer: 19, score: 98}, {correctAnswer: 20, score: 101},
+      {correctAnswer: 21, score: 101}, {correctAnswer: 22, score: 104}, {correctAnswer: 23, score: 104},
+      {correctAnswer: 24, score: 108}, {correctAnswer: 25, score: 108}, {correctAnswer: 26, score: 112},
+      {correctAnswer: 27, score: 112}, {correctAnswer: 28, score: 116}, {correctAnswer: 29, score: 116},
+      {correctAnswer: 30, score: 120}, {correctAnswer: 31, score: 120}, {correctAnswer: 32, score: 123},
+      {correctAnswer: 33, score: 125}, {correctAnswer: 34, score: 132}, {correctAnswer: 35, score: 139},
     ];
     setScoringMap(defaultScoring);
     setHasUnsavedChanges(true);
@@ -741,60 +785,130 @@ export default function QuizDetailPage({ params }: PageProps) {
           </h1>
           
           {!isCreateMode && (
-            <div className="flex items-center gap-3">
-              {/* Generate Link button */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  const quizUrl = `${window.location.origin}/quiz/${quizToken || quizId}`;
-                  navigator.clipboard.writeText(quizUrl);
-                  setDialogType('success');
-                  setDialogMessage('Quiz link copied to clipboard!');
-                  setShowDialog(true);
-                }}
-                className="border-blue-600 text-blue-700 hover:bg-blue-50"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Generate Link
-              </Button>
+            <div className="flex flex-col gap-3">
+              {/* Display generated link if exists */}
+              {quizToken && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-blue-600 font-medium mb-1">Quiz Link:</p>
+                      <p className="text-sm text-blue-900 font-mono truncate">{quizToken}</p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        navigator.clipboard.writeText(quizToken);
+                        setDialogType('success');
+                        setDialogMessage('Link copied to clipboard!');
+                        setShowDialog(true);
+                      }}
+                      className="text-blue-600 hover:text-blue-800 hover:bg-blue-100 flex-shrink-0"
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              {/* Action buttons */}
+              <div className="flex items-center gap-3">
+                {/* Generate/Regenerate Link button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    try {
+                      const result = await API.quizzes.generateQuizLink(Number(quizId));
+                      if (result.success && result.data) {
+                        const quizUrl = result.data.shortUrl || result.data.normalUrl;
+                        
+                        // Update local state with new URLs and published status
+                        setQuizToken(quizUrl);
+                        setFormData({ ...formData, isPublished: true });
+                        
+                        setDialogType('success');
+                        setDialogMessage(`Quiz link ${quizToken ? 'regenerated' : 'generated'} successfully and copied to clipboard!`);
+                        setShowDialog(true);
+                        
+                        // Also copy to clipboard
+                        navigator.clipboard.writeText(quizUrl);
+                      } else {
+                        setDialogType('error');
+                        setDialogMessage(result.message || 'Failed to generate quiz link');
+                        setShowDialog(true);
+                      }
+                    } catch (err: any) {
+                      console.error('Failed to generate link:', err);
+                      setDialogType('error');
+                      setDialogMessage(err?.message || 'Failed to generate quiz link');
+                      setShowDialog(true);
+                    }
+                  }}
+                  className="border-blue-600 text-blue-700 hover:bg-blue-50"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  {quizToken ? 'Regenerate Link' : 'Generate Link'}
+                </Button>
 
-              {/* Publish/Unpublish button */}
-              <Button
-                size="sm"
-                onClick={async () => {
-                  try {
-                    const newPublishStatus = !formData.isPublished;
-                    await handleSave();
-                    setFormData({ ...formData, isPublished: newPublishStatus });
-                    setDialogType('success');
-                    setDialogMessage(`Quiz ${newPublishStatus ? 'published' : 'unpublished'} successfully!`);
-                    setShowDialog(true);
-                  } catch (err) {
-                    setDialogType('error');
-                    setDialogMessage('Failed to update publish status');
-                    setShowDialog(true);
+                {/* Publish/Unpublish button */}
+                <Button
+                  size="sm"
+                  onClick={async () => {
+                    try {
+                      const isCurrentlyPublished = formData.isPublished;
+                      let result;
+                      
+                      if (isCurrentlyPublished) {
+                        result = await API.quizzes.unpublishQuiz(Number(quizId));
+                      } else {
+                        result = await API.quizzes.publishQuiz(Number(quizId));
+                      }
+                      
+                      if (result.success) {
+                        setFormData({ ...formData, isPublished: !isCurrentlyPublished });
+                        
+                        // Update token if published
+                        if (result.data?.shortUrl || result.data?.normalUrl) {
+                          const newToken = result.data.shortUrl || result.data.normalUrl || '';
+                          setQuizToken(newToken);
+                        }
+                        
+                        setDialogType('success');
+                        setDialogMessage(`Quiz ${!isCurrentlyPublished ? 'published' : 'unpublished'} successfully!`);
+                        setShowDialog(true);
+                      } else {
+                        setDialogType('error');
+                        setDialogMessage(result.message || 'Failed to update publish status');
+                        setShowDialog(true);
+                      }
+                    } catch (err: any) {
+                      console.error('Failed to update publish status:', err);
+                      setDialogType('error');
+                      setDialogMessage(err?.message || 'Failed to update publish status');
+                      setShowDialog(true);
+                    }
+                  }}
+                  className={formData.isPublished 
+                    ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
+                    : "bg-green-600 hover:bg-green-700 text-white"
                   }
-                }}
-                className={formData.isPublished 
-                  ? "bg-yellow-600 hover:bg-yellow-700 text-white" 
-                  : "bg-green-600 hover:bg-green-700 text-white"
-                }
-              >
-                {formData.isPublished ? 'Unpublish' : 'Publish'}
-              </Button>
+                >
+                  {formData.isPublished ? 'Unpublish' : 'Publish'}
+                </Button>
 
-              {/* Copy as Template button */}
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleCopyAsTemplate}
-                disabled={copying}
-                className="border-purple-600 text-purple-700 hover:bg-purple-50"
-              >
-                <Copy className="w-4 h-4 mr-2" />
-                Copy as Template
-              </Button>
+                {/* Copy as Template button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleCopyAsTemplate}
+                  disabled={copying}
+                  className="border-purple-600 text-purple-700 hover:bg-purple-50"
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy as Template
+                </Button>
+              </div>
             </div>
           )}
         </div>
@@ -956,7 +1070,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                   type="number"
                   value={formData.questionsPerPage}
                   onChange={(e) => {
-                    setFormData({ ...formData, questionsPerPage: parseInt(e.target.value) || 1 });
+                    setFormData({ ...formData, questionsPerPage: parseInt(e.target.value) || 10 });
                     setHasUnsavedChanges(true);
                   }}
                   min="1"
@@ -1021,6 +1135,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                             </div>
                             <p className="text-sm font-medium">{question.questionText}</p>
                             
+                            {/* TODO: Image functionality - currently disabled
                             {question.imageUrl && (
                               <div className="mt-2 border rounded-lg p-2 bg-white inline-block">
                                 <img 
@@ -1033,6 +1148,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                                 />
                               </div>
                             )}
+                            */}
                           </div>
                           
                           <div className="flex gap-2 ml-4">
@@ -1056,16 +1172,16 @@ export default function QuizDetailPage({ params }: PageProps) {
                             {question.options.map((option, optIndex) => (
                               <div key={optIndex} className="flex items-center gap-2 text-sm">
                                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs ${
-                                  question.correctAnswers.includes(option)
+                                  question.correctAnswer.includes(option)
                                     ? 'bg-green-100 text-green-700 font-semibold'
                                     : 'bg-gray-200 text-gray-600'
                                 }`}>
                                   {String.fromCharCode(65 + optIndex)}
                                 </span>
-                                <span className={question.correctAnswers.includes(option) ? 'font-medium' : ''}>
+                                <span className={question.correctAnswer.includes(option) ? 'font-medium' : ''}>
                                   {option}
                                 </span>
-                                {question.correctAnswers.includes(option) && (
+                                {question.correctAnswer.includes(option) && (
                                   <CheckCircle className="w-3 h-3 text-green-600 ml-1" />
                                 )}
                               </div>
@@ -1077,7 +1193,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                           <div className="mt-2 text-sm">
                             <span className="text-gray-600">Jawaban benar: </span>
                             <span className="font-medium">
-                              {question.correctAnswers.includes('true') ? 'Benar' : 'Salah'}
+                              {question.correctAnswer.includes('true') ? 'Benar' : 'Salah'}
                             </span>
                           </div>
                         )}
@@ -1105,7 +1221,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                     Generate Default (0-35)
                   </Button>
                   <Button onClick={() => {
-                    setEditingScoring({ correctAnswers: scoringMap.length, score: 0 });
+                    setEditingScoring({ correctAnswer: scoringMap.length, score: 0 });
                     setShowScoringDialog(true);
                   }} size="sm">
                     <Plus className="w-4 h-4 mr-2" />
@@ -1119,7 +1235,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                   <p className="text-gray-500 mb-4">Belum ada pemetaan scoring</p>
                   <div className="flex gap-2 justify-center">
                     <Button onClick={() => {
-                      setEditingScoring({ correctAnswers: 0, score: 73 });
+                      setEditingScoring({ correctAnswer: 0, score: 73 });
                       setShowScoringDialog(true);
                     }} variant="outline">
                       <Plus className="w-4 h-4 mr-2" />
@@ -1148,11 +1264,11 @@ export default function QuizDetailPage({ params }: PageProps) {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {scoringMap
-                        .sort((a, b) => a.correctAnswers - b.correctAnswers)
+                        .sort((a, b) => a.correctAnswer - b.correctAnswer)
                         .map((scoring, index) => (
                         <tr key={index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {scoring.correctAnswers}
+                            {scoring.correctAnswer}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {scoring.score}
@@ -1367,7 +1483,7 @@ export default function QuizDetailPage({ params }: PageProps) {
               </div>
 
               <div>
-                <Label htmlFor="imageUrl">
+                {/* <Label htmlFor="imageUrl">
                   URL Gambar (Opsional)
                 </Label>
                 <div className="flex gap-2">
@@ -1389,7 +1505,8 @@ export default function QuizDetailPage({ params }: PageProps) {
                       <ImageIcon className="w-4 h-4" />
                     </Button>
                   )}
-                </div>
+                </div> */}
+                {/* TODO: Image functionality - currently disabled
                 {editingQuestion.imageUrl && (
                   <div className="mt-2 border rounded-lg p-2 bg-gray-50">
                     <img 
@@ -1406,6 +1523,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                     </p>
                   </div>
                 )}
+                */}
               </div>
 
               <div>
@@ -1416,13 +1534,13 @@ export default function QuizDetailPage({ params }: PageProps) {
                     const newQuestion = { ...editingQuestion, questionType: value };
                     if (value === 'true_false') {
                       newQuestion.options = ['true', 'false'];
-                      newQuestion.correctAnswers = [];
+                      newQuestion.correctAnswer = [];
                     } else if (value === 'essay') {
                       newQuestion.options = [];
-                      newQuestion.correctAnswers = [];
+                      newQuestion.correctAnswer = [];
                     } else if (editingQuestion.questionType !== 'multiple_choice') {
                       newQuestion.options = ['', '', '', ''];
-                      newQuestion.correctAnswers = [];
+                      newQuestion.correctAnswer = [];
                     }
                     setEditingQuestion(newQuestion);
                   }}
@@ -1459,7 +1577,7 @@ export default function QuizDetailPage({ params }: PageProps) {
                         <div key={index} className="flex gap-2 items-center">
                           <input
                             type="checkbox"
-                            checked={editingQuestion.correctAnswers.includes(option)}
+                            checked={editingQuestion.correctAnswer.includes(option)}
                             onChange={() => toggleCorrectAnswer(option)}
                             disabled={isOptionEmpty}
                             className={`w-4 h-4 ${isOptionEmpty ? 'opacity-50 cursor-not-allowed' : 'text-green-600 cursor-pointer'}`}
@@ -1503,8 +1621,8 @@ export default function QuizDetailPage({ params }: PageProps) {
                       <input
                         type="radio"
                         name="trueFalse"
-                        checked={editingQuestion.correctAnswers.includes('true')}
-                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswers: ['true'] })}
+                        checked={editingQuestion.correctAnswer.includes('true')}
+                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswer: ['true'] })}
                         className="w-4 h-4"
                       />
                       <span>Benar</span>
@@ -1513,8 +1631,8 @@ export default function QuizDetailPage({ params }: PageProps) {
                       <input
                         type="radio"
                         name="trueFalse"
-                        checked={editingQuestion.correctAnswers.includes('false')}
-                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswers: ['false'] })}
+                        checked={editingQuestion.correctAnswer.includes('false')}
+                        onChange={() => setEditingQuestion({ ...editingQuestion, correctAnswer: ['false'] })}
                         className="w-4 h-4"
                       />
                       <span>Salah</span>
@@ -1553,7 +1671,7 @@ export default function QuizDetailPage({ params }: PageProps) {
         >
           <DialogHeader>
             <DialogTitle>
-              {editingScoring && scoringMap.find(s => s.correctAnswers === editingScoring.correctAnswers) 
+              {editingScoring && scoringMap.find(s => s.correctAnswer === editingScoring.correctAnswer) 
                 ? 'Edit Scoring' 
                 : 'Tambah Scoring'}
             </DialogTitle>
@@ -1562,17 +1680,17 @@ export default function QuizDetailPage({ params }: PageProps) {
           {editingScoring && (
             <div className="space-y-4">
               <div>
-                <Label htmlFor="correctAnswers">
+                <Label htmlFor="correctAnswer">
                   Jumlah Jawaban Benar <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="correctAnswers"
+                  id="correctAnswer"
                   type="number"
                   min="0"
-                  value={editingScoring.correctAnswers}
+                  value={editingScoring.correctAnswer}
                   onChange={(e) => setEditingScoring({
                     ...editingScoring,
-                    correctAnswers: parseInt(e.target.value) || 0
+                    correctAnswer: parseInt(e.target.value) || 0
                   })}
                   placeholder="Contoh: 10"
                   required

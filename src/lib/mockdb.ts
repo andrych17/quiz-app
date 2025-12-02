@@ -286,8 +286,9 @@ const quizzes: Quiz[] = [
     id: randomUUID(),
     title: "Test Masuk Service Management Batch 1",
     slug: "test-sm-batch-1",
-    linkToken: "sm-batch-1-2024",
+    linkToken: "C3E806851828",
     isPublished: true,
+    durationMinutes: 90, // 90 minutes duration
     expiresAt: new Date(2025, 8, 30, 23, 59, 59).toISOString(), // Aug 30, 2025 23:59:59
     passingScore: 7, // minimum 7 correct answers to pass (70%)
     questionsPerPage: 5, // show 5 questions per page
@@ -1026,3 +1027,6 @@ export const db = {
     };
   },
 };
+
+// Export as mockDB for backward compatibility
+export const mockDB = db;

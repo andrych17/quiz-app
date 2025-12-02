@@ -43,6 +43,19 @@ export function Sidebar({ onLogout, isOpen = false, onClose }: SidebarProps) {
       )
     },
     {
+      href: "/admin/quiz-results",
+      label: "Quiz Results",
+      show: true,
+      icon: (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                d="M9 12l2 2 4-4" />
+        </svg>
+      )
+    },
+    {
       href: "/admin/users",
       label: "User Management",
       show: canManageUsers,

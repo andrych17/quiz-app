@@ -1,166 +1,217 @@
-"use client";
+'use client';
 
-import { useState, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { API } from "@/lib/api-client";
-import type { Quiz, Question, QuizSession } from "@/types/api";
+import React, { useEffect, useState, useRef } from 'react';
+import { useParams } from 'next/navigation';
+import { API } from '@/lib/api-client';
+import { Quiz, Question, ApiError } from '@/types/api';
 
-interface Answer {
-  questionId: number;
-  answer: string;
-  selectedOptions?: string[];
-}
-
-export default function QuizSessionPage() {
+export default function PublicQuizPage() {
   const params = useParams();
-  const router = useRouter();
-  const sessionToken = params.token as string;
-
-  const [session, setSession] = useState<QuizSession | null>(null);
+  const token = params.token as string;
+  
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers] = useState<Answer[]>([]);
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPaused, setIsPaused] = useState(false);
+  const [participantInfo, setParticipantInfo] = useState({
+    name: '',
+    email: '',
+    nij: ''
+  });
+  const [currentAnswers, setCurrentAnswers] = useState<{[key: number]: string | string[]}>({});
+  const [attemptId, setAttemptId] = useState<number | null>(null);
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const [quizStartTime, setQuizStartTime] = useState<Date | null>(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfirmSubmit, setShowConfirmSubmit] = useState(false);
-
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({});
+  const [participantDataLoading, setParticipantDataLoading] = useState(false);
+  const [hasSubmittedBefore, setHasSubmittedBefore] = useState(false);
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    if (sessionToken) {
-      loadSession();
+    console.log('=== PUBLIC QUIZ PAGE ===');
+    console.log('Token:', token);
+    if (token) {
+      loadQuiz();
     }
+  }, [token]);
 
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
-    };
-  }, [sessionToken]);
-
+  // Timer countdown
   useEffect(() => {
-    if (timeLeft > 0 && !isPaused) {
-      timerRef.current = setTimeout(() => {
-        setTimeLeft(prev => {
-          if (prev <= 1) {
-            handleAutoSubmit();
-            return 0;
-          }
-          return prev - 1;
-        });
+    if (timeLeft !== null && timeLeft > 0 && showQuiz) {
+      const timer = setTimeout(() => {
+        setTimeLeft(timeLeft - 1);
       }, 1000);
-    } else if (timerRef.current) {
-      clearTimeout(timerRef.current);
+      return () => clearTimeout(timer);
+    } else if (timeLeft === 0) {
+      // Time's up - auto submit
+      handleSubmitQuiz();
     }
+  }, [timeLeft, showQuiz]);
 
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-    };
-  }, [timeLeft, isPaused]);
-
+  // Auto-save answers every 10 seconds
   useEffect(() => {
-    // Auto-save answers every 30 seconds
-    if (session && answers.length > 0) {
-      autoSaveRef.current = setInterval(() => {
-        saveAnswersToSession();
-      }, 30000);
+    if (showQuiz && attemptId && Object.keys(currentAnswers).length > 0) {
+      const interval = setInterval(() => {
+        saveAnswersAsync();
+      }, 10000); // Save every 10 seconds
+      return () => clearInterval(interval);
     }
+  }, [showQuiz, attemptId, currentAnswers]);
 
-    return () => {
-      if (autoSaveRef.current) clearInterval(autoSaveRef.current);
-    };
-  }, [session, answers]);
-
-  const loadSession = async () => {
+  const loadQuiz = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const response = await API.sessions.getSession(sessionToken);
+      console.log('Loading quiz with token:', token);
+      const response = await API.public.getPublicQuiz(token);
+      console.log('Quiz response:', response);
+      console.log('Response success:', response.success);
+      console.log('Response data:', response.data);
 
       if (response.success && response.data) {
-        const sessionData = response.data;
-        setSession(sessionData);
-
-        // Load quiz data
-        const quizResponse = await API.quizzes.getQuiz(sessionData.quizId);
-        if (quizResponse.success && quizResponse.data) {
-          setQuiz(quizResponse.data);
-        }
-
-        // Load questions
-        const questionsResponse = await API.questions.getQuestions();
-        if (questionsResponse.success && questionsResponse.data) {
-          const allQuestions = (questionsResponse.data as any)?.items || questionsResponse.data || [];
-          const quizQuestions = Array.isArray(allQuestions) 
-            ? allQuestions.filter((q: any) => q.quizId === sessionData.quizId)
-            : [];
-          setQuestions(quizQuestions);
-        }
-
-        // Calculate time left
-        if (sessionData.expiresAt) {
-          const now = new Date();
-          const expiry = new Date(sessionData.expiresAt);
-          const secondsLeft = Math.floor((expiry.getTime() - now.getTime()) / 1000);
-          setTimeLeft(Math.max(0, secondsLeft));
-        }
-
-        // Load existing answers if any
-        if ((sessionData as any).answers) {
-          setAnswers((sessionData as any).answers);
-        }
-
-        // Check if session is still valid
-        if ((sessionData as any).status === 'completed') {
-          router.push(`/quiz/${sessionToken}/results`);
-          return;
-        }
-
-        if ((sessionData as any).status === 'expired') {
-          setError('This quiz session has expired.');
-          return;
-        }
-
+        // The API returns the quiz directly in data with questions as a property
+        setQuiz(response.data);
+        
+        // Use actual questions from API
+        const quizQuestions = response.data.questions || [];
+        
+        setQuestions(quizQuestions);
+        console.log('Quiz loaded successfully:', {
+          title: response.data.title,
+          questionsCount: quizQuestions.length,
+          questionsPerPage: response.data.questionsPerPage || 5,
+          isPublished: response.data.isPublished,
+          isActive: response.data.isActive,
+          actualQuestions: quizQuestions.map(q => ({
+            id: q.id,
+            type: (q as any).questionType || q.type,
+            text: ((q as any).questionText || q.question || 'No text')?.substring(0, 50) + '...'
+          }))
+        });
       } else {
-        setError('Quiz session not found or invalid.');
+        const errorMsg = response?.message || 'Quiz not found or not published';
+        setError(errorMsg);
+        console.error('Quiz load failed:', { 
+          success: response?.success, 
+          message: response?.message,
+          data: response?.data 
+        });
       }
 
     } catch (err: any) {
-      console.error('Failed to load session:', err);
-      setError(err?.message || 'Failed to load quiz session');
+      console.error('Failed to load quiz:', err);
+      setError(err?.message || 'Failed to load quiz');
     } finally {
       setLoading(false);
     }
   };
 
-  const saveAnswersToSession = async () => {
-    if (!session || answers.length === 0) return;
+  const handleStartQuiz = async () => {
+    // Validate form first
+    if (!validateForm()) {
+      setError('Mohon perbaiki data yang tidak valid');
+      return;
+    }
+
+    setIsStarting(true);
+    setError(null);
+    setValidationErrors({});
+    
+    try {
+      console.log('Starting quiz with participant info:', participantInfo);
+      
+      if (!quiz) {
+        setError('Quiz not found');
+        setIsStarting(false);
+        return;
+      }
+
+      // Check for duplicate submission via API before starting
+      const alreadySubmitted = await checkParticipantSubmission(participantInfo.nij);
+      
+      if (alreadySubmitted) {
+        setIsStarting(false);
+        return; // Don't start if already submitted
+      }
+
+      // Save participant data to localStorage for future auto-fill
+      const participantKey = `participant_${participantInfo.nij}`;
+      localStorage.setItem(participantKey, JSON.stringify({
+        email: participantInfo.email,
+        name: participantInfo.name
+      }));
+
+      // Start quiz directly without API call (no submission yet)
+      const localAttemptId = Date.now();
+      setAttemptId(localAttemptId);
+      setQuizStartTime(new Date());
+      const duration = quiz?.durationMinutes || 60;
+      setTimeLeft(duration * 60); // Convert minutes to seconds
+      setShowQuiz(true);
+      
+      console.log('Quiz started successfully with local attemptId:', localAttemptId);
+    } catch (err: any) {
+      console.error('Failed to start quiz:', err);
+      setError(err?.message || 'Gagal memulai quiz');
+    } finally {
+      setIsStarting(false);
+    }
+  };
+
+  const saveAnswersAsync = async () => {
+    if (!attemptId || Object.keys(currentAnswers).length === 0) return;
 
     try {
-      await API.sessions.saveAnswers(sessionToken, { answers });
+      const answersArray = Object.entries(currentAnswers).map(([questionId, answer]) => ({
+        questionId: parseInt(questionId),
+        answer: Array.isArray(answer) ? answer.join(',') : (answer as string)
+      }));
+      
+      if (!quiz) return;
+      
+      await API.public.submitQuiz(token, {
+        nij: participantInfo.nij,
+        email: participantInfo.email,
+        participantName: participantInfo.name,
+        quizId: quiz.id,
+        answers: answersArray
+      });
+      console.log('Answers auto-saved successfully');
     } catch (err: any) {
       console.error('Failed to auto-save answers:', err);
       // Don't show error to user for auto-save failures
     }
   };
 
-  const handleAnswerChange = (questionId: number, answer: string, selectedOptions?: string[]) => {
-    setAnswers(prev => {
-      const existing = prev.find(a => a.questionId === questionId);
-      if (existing) {
-        return prev.map(a => 
-          a.questionId === questionId 
-            ? { ...a, answer, selectedOptions }
-            : a
-        );
+  const handleAnswerChange = (questionId: number, answer: string | string[]) => {
+    setCurrentAnswers(prev => ({
+      ...prev,
+      [questionId]: answer
+    }));
+  };
+
+  const handleMultipleAnswerChange = (questionId: number, optionValue: string, isChecked: boolean) => {
+    setCurrentAnswers(prev => {
+      const currentAnswer = prev[questionId] as string[] || [];
+      let newAnswer: string[];
+      
+      if (isChecked) {
+        newAnswer = [...currentAnswer, optionValue];
       } else {
-        return [...prev, { questionId, answer, selectedOptions }];
+        newAnswer = currentAnswer.filter(item => item !== optionValue);
       }
+      
+      return {
+        ...prev,
+        [questionId]: newAnswer
+      };
     });
   };
 
@@ -176,49 +227,155 @@ export default function QuizSessionPage() {
     }
   };
 
-  const handlePauseResume = () => {
-    setIsPaused(prev => !prev);
+  // Validation functions
+  const validateEmail = (email: string): string | null => {
+    if (!email.trim()) return 'Email harus diisi';
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) return 'Format email tidak valid';
+    return null;
   };
 
-  const handleAutoSubmit = async () => {
-    setIsSubmitting(true);
+  const validateNIJ = (nij: string): string | null => {
+    if (!nij.trim()) return 'NIJ harus diisi';
+    if (nij.length < 3) return 'NIJ minimal 3 karakter';
+    return null;
+  };
+
+  const validateName = (name: string): string | null => {
+    if (!name.trim()) return 'Nama lengkap harus diisi';
+    if (name.length < 2) return 'Nama minimal 2 karakter';
+    return null;
+  };
+
+  const validateForm = (): boolean => {
+    const errors: {[key: string]: string} = {};
+    
+    const nijError = validateNIJ(participantInfo.nij);
+    if (nijError) errors.nij = nijError;
+    
+    const emailError = validateEmail(participantInfo.email);
+    if (emailError) errors.email = emailError;
+    
+    const nameError = validateName(participantInfo.name);
+    if (nameError) errors.name = nameError;
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Function to check if participant already submitted (using API and localStorage)
+  const checkParticipantSubmission = async (nij: string, email?: string): Promise<boolean> => {
+    if (!nij || nij.length < 3) return false;
+    
+    setParticipantDataLoading(true);
     try {
-      // Save final answers
-      await saveAnswersToSession();
+      // Check via API with NIJ (and email if provided)
+      try {
+        const checkData = email ? { nij, email } : { nij };
+        const checkResponse = await API.public.checkQuizSubmission(token, checkData);
+        
+        if (checkResponse.success && checkResponse.data.hasSubmitted) {
+          setHasSubmittedBefore(true);
+          setError('Anda sudah pernah mengerjakan quiz ini. Setiap peserta hanya dapat mengerjakan quiz sekali.');
+          return true; // Already submitted
+        }
+        
+        // If participant exists in API response but hasn't submitted, auto-fill the form
+        if (checkResponse.success && checkResponse.data.submission && !checkResponse.data.hasSubmitted) {
+          const participantData = checkResponse.data.submission;
+          setParticipantInfo(prev => ({
+            ...prev,
+            name: participantData.participantName || prev.name,
+            email: participantData.email || prev.email
+          }));
+        }
+      } catch (apiErr: any) {
+        console.log('API check failed, falling back to localStorage:', apiErr);
+      }
       
-      // Submit quiz
-      const response = await API.sessions.submitSession(sessionToken, { answers });
+      // Check localStorage for submission history
+      const submissionKey = `quiz_${token}_${nij}`;
+      const hasSubmitted = localStorage.getItem(submissionKey);
       
-      if (response.success) {
-        router.push(`/quiz/${sessionToken}/results`);
+      if (hasSubmitted) {
+        setHasSubmittedBefore(true);
+        setError('Anda sudah pernah mengerjakan quiz ini. Hanya diperbolehkan satu kali pengerjaan.');
+        return true; // Already submitted
       } else {
-        setError('Failed to submit quiz. Please try again.');
+        setHasSubmittedBefore(false);
+        if (!email) setError(null); // Only clear error if not from start quiz flow
+        
+        // Try to get saved participant data for auto-fill
+        const participantKey = `participant_${nij}`;
+        const savedData = localStorage.getItem(participantKey);
+        if (savedData) {
+          try {
+            const data = JSON.parse(savedData);
+            setParticipantInfo(prev => ({
+              ...prev,
+              email: data.email || prev.email,
+              name: data.name || prev.name
+            }));
+          } catch (e) {
+            console.log('Could not parse saved participant data');
+          }
+        }
+        return false; // Not submitted
       }
     } catch (err: any) {
-      console.error('Auto-submit failed:', err);
-      setError('Failed to submit quiz automatically.');
+      console.log('Error checking submission status:', err);
+      setHasSubmittedBefore(false);
+      return false; // Assume not submitted on error
     } finally {
-      setIsSubmitting(false);
+      setParticipantDataLoading(false);
     }
   };
 
-  const handleManualSubmit = async () => {
+  const handleSubmitQuiz = async () => {
     setIsSubmitting(true);
     try {
-      // Save final answers
-      await saveAnswersToSession();
+      // Final submit with all answers
+      const answersArray = Object.entries(currentAnswers).map(([questionId, answer]) => ({
+        questionId: parseInt(questionId),
+        answer: Array.isArray(answer) ? answer.join(',') : (answer as string)
+      }));
       
-      // Submit quiz
-      const response = await API.sessions.submitSession(sessionToken, { answers });
+      if (!quiz) {
+        setError('Quiz not found');
+        return;
+      }
       
+      const response = await API.public.submitQuiz(token, {
+        nij: participantInfo.nij,
+        email: participantInfo.email,
+        participantName: participantInfo.name,
+        quizId: quiz.id,
+        answers: answersArray
+      });
+
       if (response.success) {
-        router.push(`/quiz/${sessionToken}/results`);
+        // Save submission to localStorage to prevent duplicate attempts
+        const submissionKey = `quiz_${token}_${participantInfo.nij}`;
+        const participantKey = `participant_${participantInfo.nij}`;
+        
+        localStorage.setItem(submissionKey, 'true');
+        localStorage.setItem(participantKey, JSON.stringify({
+          email: participantInfo.email,
+          name: participantInfo.name
+        }));
+        
+        console.log('Quiz submitted successfully, saved to localStorage');
+        
+        // Show completion message instead of redirecting
+        setShowQuiz(false);
+        setError(null);
+        alert(`Anda telah menyelesaikan quiz. NIJ: ${participantInfo.nij}`);
       } else {
-        setError('Failed to submit quiz. Please try again.');
+        setError('Gagal mengirim jawaban. Silakan coba lagi.');
       }
     } catch (err: any) {
-      console.error('Manual submit failed:', err);
-      setError('Failed to submit quiz. Please try again.');
+      console.error('Submit failed:', err);
+      setError('Gagal mengirim jawaban. Silakan coba lagi.');
     } finally {
       setIsSubmitting(false);
       setShowConfirmSubmit(false);
@@ -237,40 +394,194 @@ export default function QuizSessionPage() {
     }
   };
 
-  const getAnswerForQuestion = (questionId: number) => {
-    return answers.find(a => a.questionId === questionId);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading quiz session...</p>
+          <p className="text-gray-600">Loading quiz...</p>
         </div>
       </div>
     );
   }
 
-  if (error || !session || !quiz) {
+  if (error || !quiz) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center text-red-600">
-          <p className="text-xl mb-4">⚠️ {error || 'Session not found'}</p>
-          <button
-            onClick={() => router.push('/')}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Go Home
-          </button>
+          <p className="text-xl mb-4">⚠️ {error || 'Quiz not found'}</p>
+          <p className="text-gray-600">Silakan hubungi administrator untuk mendapatkan link quiz yang valid.</p>
         </div>
       </div>
     );
   }
 
-  const currentQuestion = questions[currentQuestionIndex];
-  const currentAnswer = currentQuestion ? getAnswerForQuestion(currentQuestion.id) : null;
-  const answeredCount = answers.filter(a => a.answer && a.answer.trim()).length;
+  // Show participant info form if quiz not started
+  if (!showQuiz) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center mb-6">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">{quiz.title}</h1>
+            <p className="text-gray-600">{quiz.description}</p>
+            <div className="mt-4 text-sm text-gray-500">
+              <p>⏱️ Waktu: {quiz.durationMinutes || 60} menit</p>
+              <p>📝 Jumlah pertanyaan: {questions.length}</p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                NIJ *
+              </label>
+              <input
+                type="text"
+                value={participantInfo.nij}
+                onChange={(e) => {
+                  setParticipantInfo(prev => ({...prev, nij: e.target.value}));
+                  // Clear validation error when user types
+                  if (validationErrors.nij) {
+                    setValidationErrors(prev => ({...prev, nij: ''}));
+                  }
+                  // Clear previous submission check
+                  if (hasSubmittedBefore) {
+                    setHasSubmittedBefore(false);
+                    setError(null);
+                  }
+                }}
+                onBlur={() => {
+                  const error = validateNIJ(participantInfo.nij);
+                  if (error) {
+                    setValidationErrors(prev => ({...prev, nij: error}));
+                  }
+                }}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  validationErrors.nij 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                placeholder="Masukkan NIJ Anda"
+                required
+              />
+              {validationErrors.nij && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.nij}</p>
+              )}
+              {participantDataLoading && (
+                <p className="text-blue-500 text-sm mt-1">Memeriksa data peserta...</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Email *
+              </label>
+              <input
+                type="email"
+                value={participantInfo.email}
+                onChange={(e) => {
+                  setParticipantInfo(prev => ({...prev, email: e.target.value}));
+                  // Clear validation error when user types
+                  if (validationErrors.email) {
+                    setValidationErrors(prev => ({...prev, email: ''}));
+                  }
+                }}
+                onBlur={() => {
+                  const error = validateEmail(participantInfo.email);
+                  if (error) {
+                    setValidationErrors(prev => ({...prev, email: error}));
+                  }
+                }}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  validationErrors.email 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                placeholder="Masukkan email Anda"
+                required
+              />
+              {validationErrors.email && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.email}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nama Lengkap *
+              </label>
+              <input
+                type="text"
+                value={participantInfo.name}
+                onChange={(e) => {
+                  setParticipantInfo(prev => ({...prev, name: e.target.value}));
+                  // Clear validation error when user types
+                  if (validationErrors.name) {
+                    setValidationErrors(prev => ({...prev, name: ''}));
+                  }
+                }}
+                onBlur={() => {
+                  const error = validateName(participantInfo.name);
+                  if (error) {
+                    setValidationErrors(prev => ({...prev, name: error}));
+                  }
+                }}
+                className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                  validationErrors.name 
+                    ? 'border-red-300 focus:ring-red-500' 
+                    : 'border-gray-300 focus:ring-blue-500'
+                }`}
+                placeholder="Masukkan nama lengkap Anda"
+                required
+              />
+              {validationErrors.name && (
+                <p className="text-red-500 text-sm mt-1">{validationErrors.name}</p>
+              )}
+            </div>
+
+            {error && (
+              <div className="bg-red-50 text-red-700 p-3 rounded-md text-sm">
+                {error}
+              </div>
+            )}
+
+            <button
+              onClick={handleStartQuiz}
+              disabled={isStarting || !participantInfo.nij || !participantInfo.email || !participantInfo.name || Object.values(validationErrors).some(error => error) || hasSubmittedBefore}
+              className={`w-full py-3 px-4 rounded-md font-medium ${
+                isStarting || !participantInfo.nij || !participantInfo.email || !participantInfo.name || Object.values(validationErrors).some(error => error) || hasSubmittedBefore
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {isStarting ? 'Memulai Quiz...' : hasSubmittedBefore ? 'Sudah Pernah Dikerjakan' : 'Mulai Quiz'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Pagination logic
+  const questionsPerPage = quiz?.questionsPerPage || 5;
+  const totalPages = Math.ceil(questions.length / questionsPerPage);
+  const startIndex = currentPage * questionsPerPage;
+  const currentPageQuestions = questions.slice(startIndex, startIndex + questionsPerPage);
+  const answeredCount = Object.keys(currentAnswers).filter(key => {
+    const answer = currentAnswers[parseInt(key)];
+    if (Array.isArray(answer)) {
+      return answer.length > 0;
+    }
+    return answer?.toString().trim().length > 0;
+  }).length;
+  
+  console.log('Pagination info:', {
+    currentPage,
+    totalPages,
+    questionsPerPage,
+    totalQuestions: questions.length,
+    startIndex,
+    currentPageQuestionsCount: currentPageQuestions.length
+  });
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -288,27 +599,15 @@ export default function QuizSessionPage() {
             </div>
             
             <div className="flex items-center gap-4">
-              {/* Pause/Resume Button */}
-              <button
-                onClick={handlePauseResume}
-                className={`px-3 py-1 text-sm rounded ${
-                  isPaused 
-                    ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                    : 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200'
-                }`}
-              >
-                {isPaused ? '▶️ Resume' : '⏸️ Pause'}
-              </button>
-
               {/* Timer */}
               <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
-                timeLeft <= 300 ? 'bg-red-100 text-red-800' : 
-                timeLeft <= 600 ? 'bg-yellow-100 text-yellow-800' : 
+                (timeLeft || 0) <= 300 ? 'bg-red-100 text-red-800' :
+                (timeLeft || 0) <= 600 ? 'bg-yellow-100 text-yellow-800' :
                 'bg-green-100 text-green-800'
               }`}>
                 <span className="text-lg">⏰</span>
                 <span className="font-mono font-semibold">
-                  {isPaused ? 'PAUSED' : formatTime(timeLeft)}
+                  {formatTime(timeLeft || 0)}
                 </span>
               </div>
             </div>
@@ -316,108 +615,146 @@ export default function QuizSessionPage() {
         </div>
       </div>
 
-      {/* Question Content */}
+      {/* Questions Content */}
       <div className="max-w-4xl mx-auto p-6">
-        {currentQuestion && (
-          <div className="bg-white rounded-lg shadow p-6 mb-6">
-            <div className="mb-6">
-              <div className="flex justify-between items-start mb-4">
-                <h2 className="text-lg font-medium text-gray-900">
-                  Question {currentQuestionIndex + 1}
-                </h2>
-                <span className="text-sm text-gray-500">
-                  {(currentQuestion as any).points || 10} points
-                </span>
+        <div className="space-y-6">
+          {currentPageQuestions.map((question, pageIndex) => {
+            const questionNumber = startIndex + pageIndex + 1;
+            const questionAnswer = currentAnswers[question.id];
+            
+            return (
+              <div key={question.id} className="bg-white rounded-lg shadow p-6">
+                <div className="mb-6">
+                  <div className="mb-4">
+                    <h2 className="text-lg font-medium text-gray-900">
+                      Question {questionNumber}
+                    </h2>
+                  </div>
+                  
+                  <p className="text-gray-800 text-lg leading-relaxed">
+                    {(question as any).questionText || (question as any).question || (question as any).text || 'Question text'}
+                  </p>
+
+                  {/* TODO: Image functionality - currently disabled
+                  {(question as any).imageUrl && (
+                    <div className="mt-4">
+                      <img 
+                        src={(question as any).imageUrl} 
+                        alt="Question image"
+                        className="max-w-full h-auto rounded-lg"
+                      />
+                    </div>
+                  )}
+                  */}
+                </div>
+
+                {/* Answer Options */}
+                <div className="space-y-3">
+                  {(question as any).questionType === 'multiple-choice' && (question as any).options && (
+                    <div className="space-y-3">
+                      {(question as any).options.map((option: string, index: number) => (
+                        <label key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`question_${question.id}`}
+                            value={option}
+                            checked={questionAnswer === option}
+                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                            className="h-4 w-4 text-blue-600"
+                          />
+                          <span className="flex-1 text-gray-900">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {(question as any).questionType === 'multiple-select' && (question as any).options && (
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600 mb-3">📝 Pilih semua jawaban yang benar (bisa lebih dari satu)</p>
+                      {(question as any).options.map((option: string, index: number) => {
+                        const currentAnswerArray = Array.isArray(questionAnswer) ? questionAnswer : [];
+                        const isChecked = currentAnswerArray.includes(option);
+                        
+                        return (
+                          <label key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              value={option}
+                              checked={isChecked}
+                              onChange={(e) => handleMultipleAnswerChange(question.id, option, e.target.checked)}
+                              className="h-4 w-4 text-blue-600 rounded"
+                            />
+                            <span className="flex-1 text-gray-900">{option}</span>
+                          </label>
+                        );
+                      })}
+                      {Array.isArray(questionAnswer) && questionAnswer.length > 0 && (
+                        <div className="mt-2 p-2 bg-blue-50 rounded text-sm text-blue-700">
+                          Dipilih: {questionAnswer.length} jawaban
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {(question as any).questionType === 'true-false' && (
+                    <div className="space-y-3">
+                      {['true', 'false'].map((option) => (
+                        <label key={option} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
+                          <input
+                            type="radio"
+                            name={`question_${question.id}`}
+                            value={option}
+                            checked={questionAnswer === option}
+                            onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                            className="h-4 w-4 text-blue-600"
+                          />
+                          <span className="flex-1 text-gray-900 capitalize">{option}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {(question as any).questionType === 'text' && (
+                    <div>
+                      <textarea
+                        value={questionAnswer || ''}
+                        onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows={4}
+                        placeholder="Type your answer here..."
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-              
-              <p className="text-gray-800 text-lg leading-relaxed">
-                {(currentQuestion as any).question || (currentQuestion as any).text || 'Question text'}
-              </p>
-
-              {(currentQuestion as any).imageUrl && (
-                <div className="mt-4">
-                  <img 
-                    src={(currentQuestion as any).imageUrl} 
-                    alt="Question image"
-                    className="max-w-full h-auto rounded-lg"
-                  />
-                </div>
-              )}
-            </div>
-
-            {/* Answer Options */}
-            <div className="space-y-3">
-              {currentQuestion.type === 'multiple_choice' && currentQuestion.options && (
-                <div className="space-y-3">
-                  {currentQuestion.options.map((option, index) => (
-                    <label key={index} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={currentAnswer?.selectedOptions?.includes(option) || false}
-                        onChange={(e) => {
-                          const currentOptions = currentAnswer?.selectedOptions || [];
-                          let newOptions;
-                          if (e.target.checked) {
-                            newOptions = [...currentOptions, option];
-                          } else {
-                            newOptions = currentOptions.filter(opt => opt !== option);
-                          }
-                          handleAnswerChange(
-                            currentQuestion.id,
-                            newOptions.join(', '),
-                            newOptions
-                          );
-                        }}
-                        className="h-4 w-4 text-blue-600 rounded"
-                      />
-                      <span className="flex-1 text-gray-900">{option}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {currentQuestion.type === 'true_false' && (
-                <div className="space-y-3">
-                  {['True', 'False'].map((option) => (
-                    <label key={option} className="flex items-center space-x-3 p-3 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">
-                      <input
-                        type="radio"
-                        name={`question_${currentQuestion.id}`}
-                        value={option}
-                        checked={currentAnswer?.answer === option}
-                        onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                        className="h-4 w-4 text-blue-600"
-                      />
-                      <span className="flex-1 text-gray-900">{option}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {(currentQuestion.type === 'short_answer' || currentQuestion.type === 'essay') && (
-                <div>
-                  <textarea
-                    value={currentAnswer?.answer || ''}
-                    onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
-                    placeholder="Type your answer here..."
-                    className="w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-vertical"
-                    rows={currentQuestion.type === 'essay' ? 6 : 3}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+            );
+          })}
+        </div>
 
         {/* Navigation */}
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center mt-6">
           <button
-            onClick={handlePreviousQuestion}
-            disabled={currentQuestionIndex === 0}
+            onClick={() => setCurrentPage(currentPage - 1)}
+            disabled={currentPage === 0}
             className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            ← Previous
+            ← Previous Page
           </button>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              Page {currentPage + 1} of {totalPages} ({questions.length} questions)
+            </span>
+            
+            {currentPage < totalPages - 1 && (
+              <button
+                onClick={() => setCurrentPage(currentPage + 1)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Next Page →
+              </button>
+            )}
+          </div>
 
           <div className="flex gap-3">
             <button
@@ -426,59 +763,12 @@ export default function QuizSessionPage() {
             >
               Submit Quiz
             </button>
-
-            {currentQuestionIndex < questions.length - 1 && (
-              <button
-                onClick={handleNextQuestion}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Next →
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Question Navigation Grid */}
-        <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Question Navigator</h3>
-          <div className="grid grid-cols-10 gap-2">
-            {questions.map((question, index) => {
-              const isAnswered = getAnswerForQuestion(question.id)?.answer?.trim();
-              const isCurrent = index === currentQuestionIndex;
-              
-              return (
-                <button
-                  key={question.id}
-                  onClick={() => setCurrentQuestionIndex(index)}
-                  className={`w-8 h-8 rounded text-sm font-medium ${
-                    isCurrent 
-                      ? 'bg-blue-600 text-white' 
-                      : isAnswered 
-                        ? 'bg-green-100 text-green-800 hover:bg-green-200' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {index + 1}
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex gap-4 mt-4 text-sm text-gray-600">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-600 rounded"></div>
-              <span>Current</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-100 border border-green-300 rounded"></div>
-              <span>Answered</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-gray-100 border border-gray-300 rounded"></div>
-              <span>Not answered</span>
-            </div>
           </div>
         </div>
       </div>
+
+
+
 
       {/* Confirm Submit Modal */}
       {showConfirmSubmit && (
@@ -489,7 +779,7 @@ export default function QuizSessionPage() {
               Are you sure you want to submit your quiz? You have answered {answeredCount} out of {questions.length} questions.
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              Time remaining: {formatTime(timeLeft)}
+              Time remaining: {formatTime(timeLeft || 0)}
             </p>
             
             <div className="flex gap-3">
@@ -500,7 +790,7 @@ export default function QuizSessionPage() {
                 Continue Quiz
               </button>
               <button
-                onClick={handleManualSubmit}
+                onClick={handleSubmitQuiz}
                 disabled={isSubmitting}
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-300"
               >
@@ -511,25 +801,8 @@ export default function QuizSessionPage() {
         </div>
       )}
 
-      {/* Pause Overlay */}
-      {isPaused && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-40">
-          <div className="text-center text-white">
-            <div className="text-6xl mb-4">⏸️</div>
-            <h2 className="text-2xl font-semibold mb-2">Quiz Paused</h2>
-            <p className="text-lg mb-6">Click Resume to continue your quiz</p>
-            <button
-              onClick={handlePauseResume}
-              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 text-lg"
-            >
-              ▶️ Resume Quiz
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Auto-submit Warning */}
-      {timeLeft <= 60 && timeLeft > 0 && !isPaused && (
+      {timeLeft !== null && timeLeft <= 60 && timeLeft > 0 && showQuiz && (
         <div className="fixed bottom-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg">
           <div className="flex items-center gap-3">
             <span className="text-2xl">⚠️</span>
