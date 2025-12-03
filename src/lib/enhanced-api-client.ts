@@ -215,7 +215,7 @@ export class EnhancedApiClient {
   private baseUrl: string;
   private token?: string;
 
-  constructor(baseUrl = 'http://localhost:3001/api') {
+  constructor(baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api') {
     this.baseUrl = baseUrl;
   }
 

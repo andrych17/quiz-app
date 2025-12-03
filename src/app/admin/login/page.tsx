@@ -199,16 +199,6 @@ function LoginForm() {
                 Email: superadmin@gms.com<br />
                 Password: password123
               </div>
-              <div>
-                <strong>Admin Jakarta:</strong><br />
-                Email: admin.jakarta@gms.com<br />
-                Password: password123
-              </div>
-              <div>
-                <strong>Admin Surabaya:</strong><br />
-                Email: admin.surabaya@gms.com<br />
-                Password: password123
-              </div>
             </div>
           </div>
 
